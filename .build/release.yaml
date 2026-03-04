@@ -1,0 +1,103 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "CcJSON-arm64-apple-macosx26.0-release.module": ["<CcJSON-arm64-apple-macosx26.0-release.module>"]
+  "Cstdio-arm64-apple-macosx26.0-release.module": ["<Cstdio-arm64-apple-macosx26.0-release.module>"]
+  "PackageStructure": ["<PackageStructure>"]
+  "SwiftCodeEmbedded-arm64-apple-macosx26.0-release.exe": ["<SwiftCodeEmbedded-arm64-apple-macosx26.0-release.exe>"]
+  "SwiftCodeEmbedded-arm64-apple-macosx26.0-release.module": ["<SwiftCodeEmbedded-arm64-apple-macosx26.0-release.module>"]
+  "main": ["<CcJSON-arm64-apple-macosx26.0-release.module>","<Cstdio-arm64-apple-macosx26.0-release.module>","<SwiftCodeEmbedded-arm64-apple-macosx26.0-release.exe>","<SwiftCodeEmbedded-arm64-apple-macosx26.0-release.module>"]
+  "test": ["<CcJSON-arm64-apple-macosx26.0-release.module>","<Cstdio-arm64-apple-macosx26.0-release.module>","<SwiftCodeEmbedded-arm64-apple-macosx26.0-release.exe>","<SwiftCodeEmbedded-arm64-apple-macosx26.0-release.module>"]
+default: "main"
+nodes:
+  "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/CcJSON/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/Ccurl/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/Cstdio/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+commands:
+  "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/CcJSON.build/cJSON.c.o":
+    tool: clang
+    inputs: ["/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/CcJSON/cJSON.c"]
+    outputs: ["/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/CcJSON.build/cJSON.c.o"]
+    description: "Compiling CcJSON cJSON.c"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang","-fobjc-arc","-target","arm64-apple-macosx10.13","-O2","-DSWIFT_PACKAGE=1","-fblocks","-fmodules","-fmodule-name=CcJSON","-fmodules-cache-path=/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/ModuleCache","-I","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/CcJSON/include","-isysroot","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-fPIC","-g","-MD","-MT","dependencies","-MF","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/CcJSON.build/cJSON.c.d","-c","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/CcJSON/cJSON.c","-o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/CcJSON.build/cJSON.c.o"]
+    deps: "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/CcJSON.build/cJSON.c.d"
+
+  "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/Cstdio.build/Cstdio.c.o":
+    tool: clang
+    inputs: ["/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/Cstdio/Cstdio.c"]
+    outputs: ["/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/Cstdio.build/Cstdio.c.o"]
+    description: "Compiling Cstdio Cstdio.c"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang","-fobjc-arc","-target","arm64-apple-macosx10.13","-O2","-DSWIFT_PACKAGE=1","-fblocks","-fmodules","-fmodule-name=Cstdio","-fmodules-cache-path=/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/ModuleCache","-I","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/Cstdio/include","-isysroot","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-fPIC","-g","-MD","-MT","dependencies","-MF","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/Cstdio.build/Cstdio.c.d","-c","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/Cstdio/Cstdio.c","-o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/Cstdio.build/Cstdio.c.o"]
+    deps: "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/Cstdio.build/Cstdio.c.d"
+
+  "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/EmbeddedFoundation/HTTP.swift","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/EmbeddedFoundation/JSON.swift","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/EmbeddedFoundation/Shell.swift","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/EmbeddedFoundation/Utils.swift","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/Models.swift","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/OpenRouterClient.swift","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/main.swift"]
+    outputs: ["/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/sources"]
+    description: "Write auxiliary file /Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/sources"
+
+  "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/CcJSON.build/cJSON.c.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/Cstdio.build/Cstdio.c.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/HTTP.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/JSON.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/Models.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/OpenRouterClient.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/Shell.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/Utils.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/main.swift.o"]
+    outputs: ["/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.product/Objects.LinkFileList"
+
+  "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"]
+    outputs: ["/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+
+  "<CcJSON-arm64-apple-macosx26.0-release.module>":
+    tool: phony
+    inputs: ["/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/CcJSON.build/cJSON.c.o"]
+    outputs: ["<CcJSON-arm64-apple-macosx26.0-release.module>"]
+
+  "<Cstdio-arm64-apple-macosx26.0-release.module>":
+    tool: phony
+    inputs: ["/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/Cstdio.build/Cstdio.c.o"]
+    outputs: ["<Cstdio-arm64-apple-macosx26.0-release.module>"]
+
+  "<SwiftCodeEmbedded-arm64-apple-macosx26.0-release.exe>":
+    tool: phony
+    inputs: ["/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded"]
+    outputs: ["<SwiftCodeEmbedded-arm64-apple-macosx26.0-release.exe>"]
+
+  "<SwiftCodeEmbedded-arm64-apple-macosx26.0-release.module>":
+    tool: phony
+    inputs: ["/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/HTTP.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/JSON.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/Shell.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/Utils.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/Models.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/OpenRouterClient.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/main.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/Modules/SwiftCodeEmbedded.swiftmodule"]
+    outputs: ["<SwiftCodeEmbedded-arm64-apple-macosx26.0-release.module>"]
+
+  "C.SwiftCodeEmbedded-arm64-apple-macosx26.0-release.exe":
+    tool: shell
+    inputs: ["/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/CcJSON.build/cJSON.c.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/Cstdio.build/Cstdio.c.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/HTTP.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/JSON.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/Models.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/OpenRouterClient.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/Shell.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/Utils.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/main.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.product/Objects.LinkFileList"]
+    outputs: ["/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded"]
+    description: "Linking ./.build/arm64-apple-macosx/release/SwiftCodeEmbedded"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-lcurl","-L","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release","-o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded","-module-name","SwiftCodeEmbedded","-Xlinker","-no_warn_duplicate_libraries","-emit-executable","-Xlinker","-dead_strip","-Xlinker","-alias","-Xlinker","_SwiftCodeEmbedded_main","-Xlinker","_main","-Xlinker","-rpath","-Xlinker","@loader_path","@/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.product/Objects.LinkFileList","-enable-experimental-feature","Embedded","-Xlinker","-rpath","-Xlinker","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.5/macosx","-Xlinker","-rpath","-Xlinker","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx10.13","-lcurl","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g"]
+
+  "C.SwiftCodeEmbedded-arm64-apple-macosx26.0-release.module":
+    tool: shell
+    inputs: ["/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/EmbeddedFoundation/HTTP.swift","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/EmbeddedFoundation/JSON.swift","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/EmbeddedFoundation/Shell.swift","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/EmbeddedFoundation/Utils.swift","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/Models.swift","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/OpenRouterClient.swift","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/main.swift","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/CcJSON.build/cJSON.c.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/Cstdio.build/Cstdio.c.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/sources"]
+    outputs: ["/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/HTTP.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/JSON.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/Shell.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/Utils.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/Models.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/OpenRouterClient.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/main.swift.o","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/Modules/SwiftCodeEmbedded.swiftmodule"]
+    description: "Compiling Swift Module 'SwiftCodeEmbedded' (7 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","SwiftCodeEmbedded","-emit-dependencies","-emit-module","-emit-module-path","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/Modules/SwiftCodeEmbedded.swiftmodule","-output-file-map","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/output-file-map.json","-whole-module-optimization","-num-threads","14","-c","@/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/SwiftCodeEmbedded.build/sources","-I","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/Modules","-target","arm64-apple-macosx10.13","-whole-module-optimization","-num-threads","14","-Xfrontend","-mergeable-symbols","-serialize-diagnostics","-O","-j14","-DSWIFT_PACKAGE","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-Xcc","-fmodule-map-file=/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/Ccurl/module.modulemap","-Xcc","-fmodule-map-file=/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/CcJSON.build/module.modulemap","-Xcc","-I","-Xcc","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/CcJSON/include","-Xcc","-fmodule-map-file=/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/Cstdio.build/module.modulemap","-Xcc","-I","-Xcc","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/Cstdio/include","-module-cache-path","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/arm64-apple-macosx/release/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","SwiftCodeEmbedded_main","-swift-version","6","-enable-experimental-feature","Embedded","-whole-module-optimization","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","swiftcodeembedded"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/CcJSON/","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/Ccurl/","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/Cstdio/","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Package.swift","/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+

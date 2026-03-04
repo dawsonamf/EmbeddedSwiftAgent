@@ -1,0 +1,49 @@
+{
+  "": {
+    "dependencies": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/SwiftCodeEmbedded.d",
+    "object": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/SwiftCodeEmbedded.o",
+    "swift-dependencies": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/master.swiftdeps"
+  },
+  "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/EmbeddedFoundation/HTTP.swift": {
+    "object": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/HTTP.swift.o",
+    "swiftmodule": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/HTTP~partial.swiftmodule",
+    "swift-dependencies": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/HTTP.swiftdeps",
+    "diagnostics": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/HTTP.dia"
+  },
+  "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/EmbeddedFoundation/JSON.swift": {
+    "object": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/JSON.swift.o",
+    "swiftmodule": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/JSON~partial.swiftmodule",
+    "swift-dependencies": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/JSON.swiftdeps",
+    "diagnostics": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/JSON.dia"
+  },
+  "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/EmbeddedFoundation/Shell.swift": {
+    "object": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/Shell.swift.o",
+    "swiftmodule": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/Shell~partial.swiftmodule",
+    "swift-dependencies": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/Shell.swiftdeps",
+    "diagnostics": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/Shell.dia"
+  },
+  "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/EmbeddedFoundation/Utils.swift": {
+    "object": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/Utils.swift.o",
+    "swiftmodule": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/Utils~partial.swiftmodule",
+    "swift-dependencies": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/Utils.swiftdeps",
+    "diagnostics": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/Utils.dia"
+  },
+  "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/Models.swift": {
+    "object": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/Models.swift.o",
+    "swiftmodule": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/Models~partial.swiftmodule",
+    "swift-dependencies": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/Models.swiftdeps",
+    "diagnostics": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/Models.dia"
+  },
+  "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/OpenRouterClient.swift": {
+    "object": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/OpenRouterClient.swift.o",
+    "swiftmodule": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/OpenRouterClient~partial.swiftmodule",
+    "swift-dependencies": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/OpenRouterClient.swiftdeps",
+    "diagnostics": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/OpenRouterClient.dia"
+  },
+  "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/SwiftCodeEmbedded/main.swift": {
+    "object": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/main.swift.o",
+    "swiftmodule": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/main.swiftdeps",
+    "diagnostics": "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/.build/index-build/arm64-apple-macosx/debug/SwiftCodeEmbedded.build/main.dia"
+  }
+}
