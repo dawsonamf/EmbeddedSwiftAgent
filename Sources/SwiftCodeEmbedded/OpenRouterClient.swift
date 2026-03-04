@@ -1,8 +1,4 @@
-#if canImport(Darwin)
-import Darwin
-#else
-import Glibc
-#endif
+import Cstdio
 
 struct OpenRouterClient {
     let apiKey: String
@@ -36,10 +32,10 @@ struct OpenRouterClient {
         let status = httpPostStreaming(url: endpoint, headers: headers, body: bodyString) { line in
             let trimmed = trimWhitespace(line)
 
-            guard trimmed.hasPrefix("data: ") else { return }
-            let payload = String(trimmed.dropFirst(6))
+            guard utf8HasPrefix(trimmed, "data: ") else { return }
+            let payload = utf8DropFirst(trimmed, 6)
 
-            if payload == "[DONE]" { return }
+            if utf8Equal(payload, "[DONE]") { return }
 
             // chunk is owned — freed automatically at end of this closure invocation
             guard let chunk = jsonParse(payload) else { return }
@@ -60,7 +56,7 @@ struct OpenRouterClient {
             // Stream reasoning content (extended thinking) dimmed
             let reasoningText = jsonGetString(jsonGet(delta, key: "reasoning"))
                 ?? jsonGetString(jsonGet(delta, key: "reasoning_content"))
-            if let reasoning = reasoningText, !reasoning.isEmpty {
+            if let reasoning = reasoningText, !utf8IsEmpty(reasoning) {
                 if !inReasoning {
                     inReasoning = true
                     print("\u{001B}[2m", terminator: "")
@@ -70,7 +66,7 @@ struct OpenRouterClient {
             }
 
             // Stream text content
-            if let text = jsonGetString(jsonGet(delta, key: "content")), !text.isEmpty {
+            if let text = jsonGetString(jsonGet(delta, key: "content")), !utf8IsEmpty(text) {
                 if inReasoning {
                     inReasoning = false
                     print("\n\u{001B}[0m", terminator: "")
@@ -101,8 +97,8 @@ struct OpenRouterClient {
             print("\n\u{001B}[0m")
         }
 
-        if !contentAccumulator.isEmpty {
-            print()
+        if !utf8IsEmpty(contentAccumulator) {
+            print("")
         }
 
         if let errorMessage = errorMessage {
@@ -118,7 +114,7 @@ struct OpenRouterClient {
         }
 
         if hasToolCall {
-            let id = toolCallId ?? "call_\(UInt32.random(in: 0...UInt32.max))"
+            let id = toolCallId ?? "call_\(c_rand())"
             let tc = ToolCall(
                 id: id,
                 functionName: toolCallFunctionName,
@@ -141,7 +137,7 @@ struct OpenRouterClient {
         jsonAddItemToObject(root, key: "model", item: jsonCreateString(model))
         jsonAddItemToObject(root, key: "stream", item: jsonCreateBool(true))
 
-        // Rreasoning
+        // Reasoning
         let reasoning = jsonCreateObject()
         jsonAddItemToObject(reasoning, key: "effort", item: jsonCreateString("high"))
         jsonAddItemToObject(root, key: "reasoning", item: reasoning)

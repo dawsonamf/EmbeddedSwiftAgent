@@ -1,8 +1,4 @@
-#if canImport(Darwin)
-import Darwin
-#else
-import Glibc
-#endif
+import Cstdio
 
 func runShell(_ command: String) -> String {
     var pipeFds = [Int32](repeating: 0, count: 2)
@@ -36,7 +32,7 @@ func runShell(_ command: String) -> String {
     var pid: pid_t = 0
 
     // environ is not thread-safe to read during concurrent modification — safe here as a single-threaded CLI
-    let spawnResult = posix_spawn(&pid, "/bin/sh", &fileActions, nil, argv, environ)
+    let spawnResult = posix_spawn(&pid, "/bin/sh", &fileActions, nil, argv, get_environ())
     posix_spawn_file_actions_destroy(&fileActions)
 
     close(writeEnd)
@@ -58,5 +54,6 @@ func runShell(_ command: String) -> String {
     var status: Int32 = 0
     waitpid(pid, &status, 0)
 
-    return String(decoding: output, as: UTF8.self)
+    output.append(0)
+    return output.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
 }

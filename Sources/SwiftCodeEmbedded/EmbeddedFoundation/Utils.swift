@@ -1,7 +1,7 @@
 import Cstdio
 
-// C stdio streams are thread-safe (internally locked), but Swift 6 can't prove it
-// from the type system alone. These thin C wrappers avoid the concurrency diagnostic.
+// MARK: - C Wrappers
+
 func flushStdout() {
     flush_stdout()
 }
@@ -10,19 +10,75 @@ func writeStderr(_ msg: String) {
     write_stderr(msg)
 }
 
-/// Trims leading and trailing whitespace characters (space, tab, CR, LF)
-/// without depending on Foundation's CharacterSet.
+/// Reads a line from stdin, stripping the trailing newline.
+/// Returns nil on EOF.
+func readLineFromStdin() -> String? {
+    guard let cStr = read_line_stdin() else { return nil }
+    let s = String(cString: cStr)
+    free(cStr)
+    return s
+}
+
+// MARK: - UTF8-Safe String Helpers
+// Embedded Swift's stdlib doesn't include the Unicode normalization / grapheme-breaking
+// tables. All string comparisons must go through the UTF8View to avoid pulling those in.
+
+func utf8IsEmpty(_ s: String) -> Bool {
+    var it = s.utf8.makeIterator()
+    return it.next() == nil
+}
+
+func utf8HasPrefix(_ s: String, _ prefix: String) -> Bool {
+    var si = s.utf8.makeIterator()
+    var pi = prefix.utf8.makeIterator()
+    while let pb = pi.next() {
+        guard let sb = si.next(), sb == pb else { return false }
+    }
+    return true
+}
+
+func utf8HasSuffix(_ s: String, _ suffix: String) -> Bool {
+    let sBytes = Array(s.utf8)
+    let pBytes = Array(suffix.utf8)
+    guard sBytes.count >= pBytes.count else { return false }
+    let offset = sBytes.count - pBytes.count
+    for i in 0..<pBytes.count {
+        if sBytes[offset + i] != pBytes[i] { return false }
+    }
+    return true
+}
+
+func utf8Equal(_ a: String, _ b: String) -> Bool {
+    var ai = a.utf8.makeIterator()
+    var bi = b.utf8.makeIterator()
+    while true {
+        let ab = ai.next()
+        let bb = bi.next()
+        if ab != bb { return false }
+        if ab == nil { return true }
+    }
+}
+
+func utf8DropFirst(_ s: String, _ n: Int) -> String {
+    let bytes = Array(s.utf8)
+    guard n < bytes.count else { return "" }
+    var slice = Array(bytes[n...])
+    slice.append(0)
+    return slice.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+}
+
+/// Trims leading and trailing ASCII whitespace (space, tab, CR, LF)
 func trimWhitespace(_ s: String) -> String {
-    let whitespace: [Character] = [" ", "\t", "\r", "\n"]
-    var start = s.startIndex
-    var end = s.endIndex
-
-    while start < end && whitespace.contains(s[start]) {
-        start = s.index(after: start)
+    var bytes = Array(s.utf8)
+    while let first = bytes.first,
+          first == 0x20 || first == 0x09 || first == 0x0D || first == 0x0A {
+        bytes.removeFirst()
     }
-    while end > start && whitespace.contains(s[s.index(before: end)]) {
-        end = s.index(before: end)
+    while let last = bytes.last,
+          last == 0x20 || last == 0x09 || last == 0x0D || last == 0x0A {
+        bytes.removeLast()
     }
-
-    return String(s[start..<end])
+    guard !bytes.isEmpty else { return "" }
+    bytes.append(0)
+    return bytes.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
 }

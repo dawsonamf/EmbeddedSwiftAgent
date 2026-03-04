@@ -1,8 +1,17 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
+#if os(macOS)
+let platformLinkerFlags: [LinkerSetting] = [
+    .unsafeFlags(["-use-ld=/usr/bin/ld"]),
+]
+#else
+let platformLinkerFlags: [LinkerSetting] = []
+#endif
+
 let package = Package(
     name: "SwiftCodeEmbedded",
+    platforms: [.macOS(.v14)],
     targets: [
         .systemLibrary(
             name: "Ccurl",
@@ -27,9 +36,13 @@ let package = Package(
             name: "SwiftCodeEmbedded",
             dependencies: ["Ccurl", "CcJSON", "Cstdio"],
             path: "Sources/SwiftCodeEmbedded",
+            swiftSettings: [
+                .enableExperimentalFeature("Embedded"),
+                .unsafeFlags(["-whole-module-optimization"]),
+            ],
             linkerSettings: [
-                .linkedLibrary("curl")
-            ]
+                .linkedLibrary("curl"),
+            ] + platformLinkerFlags
         )
     ]
 )

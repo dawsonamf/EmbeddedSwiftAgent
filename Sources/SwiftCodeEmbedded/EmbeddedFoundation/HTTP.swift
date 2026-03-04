@@ -1,10 +1,5 @@
 import Ccurl
-
-#if canImport(Darwin)
-import Darwin
-#else
-import Glibc
-#endif
+import Cstdio
 
 // MARK: - Streaming HTTP POST
 
@@ -29,9 +24,10 @@ private let curlWriteCallback: curl_write_callback = { (ptr: UnsafeMutablePointe
 
     for i in 0..<totalBytes {
         let byte = UInt8(bitPattern: ptr[i])
-        if byte == UInt8(ascii: "\n") {
+        if byte == UInt8(0x0A) {
             if !ctx.buffer.isEmpty {
-                let line = String(decoding: ctx.buffer, as: UTF8.self)
+                ctx.buffer.append(0)
+                let line = ctx.buffer.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
                 ctx.onLine(line)
                 ctx.buffer.removeAll(keepingCapacity: true)
             }
@@ -77,7 +73,8 @@ func httpPostStreaming(
 
     // Flush any remaining buffered data
     if !ctx.buffer.isEmpty {
-        let line = String(decoding: ctx.buffer, as: UTF8.self)
+        ctx.buffer.append(0)
+        let line = ctx.buffer.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
         ctx.onLine(line)
     }
 

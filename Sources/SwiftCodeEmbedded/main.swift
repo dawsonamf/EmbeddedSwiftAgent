@@ -1,8 +1,4 @@
-#if canImport(Darwin)
-import Darwin
-#else
-import Glibc
-#endif
+import Cstdio
 
 // MARK: - Configuration
 
@@ -25,14 +21,14 @@ let tools = [shellTool]
 
 // MARK: - Agent Loop
 
-var messages: [ChatMessage] = []
+nonisolated(unsafe) var messages: [ChatMessage] = []
 
 print("> ", terminator: "")
 flushStdout()
 
-while let line = readLine() {
+while let line = readLineFromStdin() {
     let input = trimWhitespace(line)
-    guard !input.isEmpty else {
+    guard !utf8IsEmpty(input) else {
         print("> ", terminator: "")
         flushStdout()
         continue
@@ -50,7 +46,7 @@ while let line = readLine() {
             let command = extractShellCommand(from: toolCall.arguments)
             print("[running: \(command)]")
             let output = runShell(command)
-            print(output, terminator: output.hasSuffix("\n") ? "" : "\n")
+            print(output, terminator: utf8HasSuffix(output, "\n") ? "" : "\n")
             messages.append(ChatMessage(
                 role: "tool",
                 content: output,
