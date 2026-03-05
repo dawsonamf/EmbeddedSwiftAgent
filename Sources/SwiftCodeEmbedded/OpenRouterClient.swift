@@ -28,10 +28,19 @@ struct OpenRouterClient {
 
         var contentAccumulator = ""
         var thinkingAccumulator = ""
-        var inText = false
-        var inReasoning = false
+        // Phase: 0=idle, 1=thinking, 2=text, 3=toolCall
+        var phase = 0
         var toolCallAccumulators: [ToolCallAccumulator] = []
         var errorMessage: String?
+
+        func closePhase() {
+            switch phase {
+            case 1: onEvent(.thinkingEnd(fullText: thinkingAccumulator))
+            case 2: onEvent(.textEnd(fullText: contentAccumulator))
+            default: break
+            }
+            phase = 0
+        }
 
         onEvent(.start)
 
@@ -59,8 +68,9 @@ struct OpenRouterClient {
             let reasoningText = jsonGetString(jsonGet(delta, key: "reasoning"))
                 ?? jsonGetString(jsonGet(delta, key: "reasoning_content"))
             if let reasoning = reasoningText, !utf8IsEmpty(reasoning) {
-                if !inReasoning {
-                    inReasoning = true
+                if phase != 1 {
+                    closePhase()
+                    phase = 1
                     onEvent(.thinkingStart)
                 }
                 thinkingAccumulator += reasoning
@@ -68,8 +78,9 @@ struct OpenRouterClient {
             }
 
             if let text = jsonGetString(jsonGet(delta, key: "content")), !utf8IsEmpty(text) {
-                if !inText {
-                    inText = true
+                if phase != 2 {
+                    closePhase()
+                    phase = 2
                     onEvent(.textStart)
                 }
                 contentAccumulator += text
@@ -77,7 +88,12 @@ struct OpenRouterClient {
             }
 
             let toolCallsArray = jsonGet(delta, key: "tool_calls")
-            for tc in jsonGetArrayElements(toolCallsArray) {
+            let toolCallElements = jsonGetArrayElements(toolCallsArray)
+            if !toolCallElements.isEmpty && phase != 3 {
+                closePhase()
+                phase = 3
+            }
+            for tc in toolCallElements {
                 let rawIndex = jsonGetInt(jsonGet(tc, key: "index")) ?? 0
                 let idx = rawIndex < 0 ? 0 : rawIndex
                 while toolCallAccumulators.count <= idx {
@@ -108,12 +124,7 @@ struct OpenRouterClient {
             }
         }
 
-        if inReasoning {
-            onEvent(.thinkingEnd(fullText: thinkingAccumulator))
-        }
-        if inText {
-            onEvent(.textEnd(fullText: contentAccumulator))
-        }
+        closePhase()
 
         var resultToolCalls: [ToolCall] = []
         for acc in toolCallAccumulators {

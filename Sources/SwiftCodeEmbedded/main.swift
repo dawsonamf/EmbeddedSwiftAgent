@@ -19,6 +19,15 @@ let shellTool = ToolDefinition(
 )
 let tools = [shellTool]
 
+// MARK: - ANSI Colors
+
+let ansiReset     = "\u{001B}[0m"
+let ansiDim       = "\u{001B}[2m"
+let ansiBold      = "\u{001B}[1m"
+let ansiRed       = "\u{001B}[31m"
+let ansiBlue      = "\u{001B}[34m"
+let ansiDimBlue   = "\u{001B}[2;34m"
+
 // MARK: - CLI Renderer
 
 /// Subscribes to AgentEvents and handles all terminal output.
@@ -27,19 +36,19 @@ func renderEvent(_ event: AgentEvent) {
     case .messageUpdate(_, let streamEvent):
         switch streamEvent {
         case .thinkingStart:
-            print("\u{001B}[2m", terminator: "")
+            print(ansiDim, terminator: "")
         case .thinkingDelta(let text):
             print(text, terminator: "")
             flushStdout()
         case .thinkingEnd:
-            print("\n\u{001B}[0m", terminator: "")
+            print("\n\(ansiReset)", terminator: "")
         case .textDelta(let text):
             print(text, terminator: "")
             flushStdout()
         case .textEnd:
             print("")
         case .error(let message):
-            writeStderr("error: \(message)\n")
+            writeStderr("\(ansiRed)error: \(message)\(ansiReset)\n")
         default:
             break
         }
@@ -47,17 +56,21 @@ func renderEvent(_ event: AgentEvent) {
     case .toolExecStart(_, let toolName, let args):
         if utf8Equal(toolName, "sh") {
             let command = extractShellCommand(from: args)
-            print("[running: \(command)]")
+            print("\(ansiBlue)[running: \(command)]\(ansiReset)")
         }
 
-    case .toolExecEnd(_, _, let result, _):
-        print(result, terminator: utf8HasSuffix(result, "\n") ? "" : "\n")
+    case .toolExecEnd(_, _, let result, let isError):
+        if isError {
+            print("\(ansiRed)\(result)\(ansiReset)", terminator: utf8HasSuffix(result, "\n") ? "" : "\n")
+        } else {
+            print("\(ansiDimBlue)\(result)\(ansiReset)", terminator: utf8HasSuffix(result, "\n") ? "" : "\n")
+        }
 
     case .toolCallSkipped(_, let toolName, let reason):
-        print("[skipped \(toolName): \(reason)]")
+        print("\(ansiDimBlue)[skipped \(toolName): \(reason)]\(ansiReset)")
 
     case .aborted:
-        print("\n[aborted]")
+        print("\n\(ansiRed)[aborted]\(ansiReset)")
 
     default:
         break
@@ -65,7 +78,7 @@ func renderEvent(_ event: AgentEvent) {
 }
 
 func showPrompt() {
-    print("> ", terminator: "")
+    print("\(ansiBold)> \(ansiReset)", terminator: "")
     flushStdout()
 }
 
@@ -100,8 +113,12 @@ showPrompt()
 while true {
     var input: String? = nil
     while input == nil {
-        if abortFlag.isSet() || inputReader.eofFlag.isSet() { break }
+        if abortFlag.isSet() { break }
         input = directInputQueue.waitAndPop(timeoutMs: 100)
+        if input == nil && inputReader.eofFlag.isSet() {
+            input = directInputQueue.popFirst()
+            break
+        }
     }
 
     if abortFlag.isSet() {

@@ -1,4 +1,0 @@
-module CcJSON {
-    umbrella "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/CcJSON/include"
-    export *
-}

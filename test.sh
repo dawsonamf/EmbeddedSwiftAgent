@@ -101,6 +101,7 @@ stop_spinner
 
 PASS=0
 FAIL=0
+SKIP=0
 
 print_result() {
     local label=$1 log=$2
@@ -112,8 +113,8 @@ print_result() {
         echo -e "${GREEN}✓${RESET} ${BOLD}$label${RESET}  $(human_size "$bytes") ${DIM}($bytes bytes)${RESET}"
         PASS=$((PASS + 1))
     elif [[ "$first" == "SKIP" ]]; then
-        echo -e "${RED}✗${RESET} ${BOLD}$label${RESET}  Docker not found"
-        FAIL=$((FAIL + 1))
+        echo -e "${DIM}–${RESET} ${BOLD}$label${RESET}  ${DIM}Docker not found (skipped)${RESET}"
+        SKIP=$((SKIP + 1))
     else
         echo -e "${RED}✗${RESET} ${BOLD}$label${RESET}"
         tail -n +2 "$log"
@@ -137,8 +138,10 @@ if $MAC_BUILT; then
     fi
 
     if [[ -z "${OPENROUTER_API_KEY:-}" ]]; then
-        echo -e "${RED}✗${RESET} ${BOLD}smoke tests${RESET}  OPENROUTER_API_KEY not set"
-        FAIL=$((FAIL + 1))
+        echo -e "${DIM}–${RESET} ${BOLD}plain response${RESET}  ${DIM}OPENROUTER_API_KEY not set (skipped)${RESET}"
+        echo -e "${DIM}–${RESET} ${BOLD}tool call success${RESET}  ${DIM}OPENROUTER_API_KEY not set (skipped)${RESET}"
+        echo -e "${DIM}–${RESET} ${BOLD}tool call failure${RESET}  ${DIM}OPENROUTER_API_KEY not set (skipped)${RESET}"
+        SKIP=$((SKIP + 3))
     else
         match() {
             local pattern="$1" text="$2"
@@ -149,9 +152,17 @@ if $MAC_BUILT; then
             fi
         }
 
+        strip_ansi() {
+            if command -v perl >/dev/null 2>&1; then
+                perl -pe 's/\e\[[0-9;]*m//g'
+            else
+                sed $'s/\x1b\[[0-9;]*m//g'
+            fi
+        }
+
         run_case() {
             local prompt="$1"
-            printf "%s" "$prompt" | OPENROUTER_API_KEY="$OPENROUTER_API_KEY" "$BINARY_PATH" 2>&1
+            printf "%s" "$prompt" | OPENROUTER_API_KEY="$OPENROUTER_API_KEY" "$BINARY_PATH" 2>&1 | strip_ansi
         }
 
         fail_test() {
@@ -164,6 +175,11 @@ if $MAC_BUILT; then
             stop_spinner
             printf "${GREEN}✓${RESET} ${BOLD}%s${RESET}\n" "$1"
             PASS=$((PASS + 1))
+        }
+
+        skip_test() {
+            printf "${DIM}–${RESET} ${BOLD}%s${RESET}  ${DIM}%s (skipped)${RESET}\n" "$1" "$2"
+            SKIP=$((SKIP + 1))
         }
 
         # 1) Plain response — agent replies and shows prompt marker
@@ -201,6 +217,12 @@ if $MAC_BUILT; then
             pass_test "tool call failure"
         fi
     fi
+else
+    echo ""
+    echo -e "${DIM}–${RESET} ${BOLD}plain response${RESET}  ${DIM}macOS build failed (skipped)${RESET}"
+    echo -e "${DIM}–${RESET} ${BOLD}tool call success${RESET}  ${DIM}macOS build failed (skipped)${RESET}"
+    echo -e "${DIM}–${RESET} ${BOLD}tool call failure${RESET}  ${DIM}macOS build failed (skipped)${RESET}"
+    SKIP=$((SKIP + 3))
 fi
 
 # ── Teardown ─────────────────────────────────────────────────
@@ -209,6 +231,10 @@ start_spinner "Tearing down"
 rm -rf .build 2>/dev/null || true
 stop_spinner
 
-echo -e "\n${GREEN}$PASS passed${RESET}, ${RED}$FAIL failed${RESET}"
+SUMMARY="${GREEN}$PASS passed${RESET}, ${RED}$FAIL failed${RESET}"
+if [ "$SKIP" -gt 0 ]; then
+    SUMMARY="$SUMMARY, ${DIM}$SKIP skipped${RESET}"
+fi
+echo -e "\n$SUMMARY"
 
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1
