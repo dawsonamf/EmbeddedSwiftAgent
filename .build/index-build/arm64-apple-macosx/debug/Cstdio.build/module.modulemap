@@ -1,0 +1,4 @@
+module Cstdio {
+    umbrella header "/Users/dawsonamf/Desktop/soc/SwiftCodeEmbedded/Sources/Cstdio/include/Cstdio.h"
+    export *
+}

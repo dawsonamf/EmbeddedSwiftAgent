@@ -7,14 +7,19 @@ struct OpenRouterClient {
     private let endpoint = "https://openrouter.ai/api/v1/chat/completions"
 
     /// Sends messages to OpenRouter with streaming enabled.
-    /// Prints assistant text to stdout in real time.
-    /// Returns the fully assembled assistant message (text or tool calls).
-    func sendStreaming(messages: [ChatMessage], tools: [ToolDefinition]) -> ChatMessage {
+    /// Emits stream events for rendering and returns a structured stream result.
+    func sendStreaming(
+        messages: [ChatMessage],
+        tools: [ToolDefinition],
+        abortFlag: AbortFlag? = nil,
+        onEvent: @escaping (StreamEvent) -> Void
+    ) -> StreamResult {
         let bodyJSON = buildRequestJSON(messages: messages, tools: tools)
         guard let bodyString = jsonPrintUnformatted(bodyJSON) else {
-            return ChatMessage(role: "assistant", content: "json-build-error: failed to serialize request")
+            let msg = "json-build-error: failed to serialize request"
+            onEvent(.error(message: msg))
+            return StreamResult(contentText: nil, thinkingText: nil, toolCalls: [], stopReason: .stop, errorMessage: msg)
         }
-        // bodyJSON is freed automatically when it goes out of scope
 
         let headers: [(String, String)] = [
             ("Authorization", "Bearer \(apiKey)"),
@@ -22,28 +27,26 @@ struct OpenRouterClient {
         ]
 
         var contentAccumulator = ""
+        var thinkingAccumulator = ""
+        var inText = false
         var inReasoning = false
-        var toolCallId: String?
-        var toolCallFunctionName = ""
-        var toolCallArguments = ""
-        var hasToolCall = false
+        var toolCallAccumulators: [ToolCallAccumulator] = []
         var errorMessage: String?
 
-        let status = httpPostStreaming(url: endpoint, headers: headers, body: bodyString) { line in
-            let trimmed = trimWhitespace(line)
+        onEvent(.start)
 
+        let status = httpPostStreaming(url: endpoint, headers: headers, body: bodyString, abortFlag: abortFlag) { line in
+            let trimmed = trimWhitespace(line)
             guard utf8HasPrefix(trimmed, "data: ") else { return }
             let payload = utf8DropFirst(trimmed, 6)
-
             if utf8Equal(payload, "[DONE]") { return }
 
-            // chunk is owned — freed automatically at end of this closure invocation
             guard let chunk = jsonParse(payload) else { return }
 
-            // Check for error responses
             if let errorObj = jsonGet(chunk, key: "error") {
                 if let msg = jsonGetString(jsonGet(errorObj, key: "message")) {
                     errorMessage = msg
+                    onEvent(.error(message: msg))
                 }
                 return
             }
@@ -53,77 +56,103 @@ struct OpenRouterClient {
 
             let delta = jsonGet(firstChoice, key: "delta")
 
-            // Stream reasoning content (extended thinking) dimmed
             let reasoningText = jsonGetString(jsonGet(delta, key: "reasoning"))
                 ?? jsonGetString(jsonGet(delta, key: "reasoning_content"))
             if let reasoning = reasoningText, !utf8IsEmpty(reasoning) {
                 if !inReasoning {
                     inReasoning = true
-                    print("\u{001B}[2m", terminator: "")
+                    onEvent(.thinkingStart)
                 }
-                print(reasoning, terminator: "")
-                flushStdout()
+                thinkingAccumulator += reasoning
+                onEvent(.thinkingDelta(text: reasoning))
             }
 
-            // Stream text content
             if let text = jsonGetString(jsonGet(delta, key: "content")), !utf8IsEmpty(text) {
-                if inReasoning {
-                    inReasoning = false
-                    print("\n\u{001B}[0m", terminator: "")
+                if !inText {
+                    inText = true
+                    onEvent(.textStart)
                 }
-                print(text, terminator: "")
-                flushStdout()
                 contentAccumulator += text
+                onEvent(.textDelta(text: text))
             }
 
-            // Accumulate tool call deltas
             let toolCallsArray = jsonGet(delta, key: "tool_calls")
             for tc in jsonGetArrayElements(toolCallsArray) {
-                hasToolCall = true
-                if let id = jsonGetString(jsonGet(tc, key: "id")) {
-                    toolCallId = id
+                let rawIndex = jsonGetInt(jsonGet(tc, key: "index")) ?? 0
+                let idx = rawIndex < 0 ? 0 : rawIndex
+                while toolCallAccumulators.count <= idx {
+                    toolCallAccumulators.append(ToolCallAccumulator())
                 }
+                var acc = toolCallAccumulators[idx]
+                let priorName = acc.functionName
+
+                if let id = jsonGetString(jsonGet(tc, key: "id")), !utf8IsEmpty(id) {
+                    acc.id = id
+                }
+
                 let fn = jsonGet(tc, key: "function")
                 if let name = jsonGetString(jsonGet(fn, key: "name")) {
-                    toolCallFunctionName += name
+                    acc.functionName += name
                 }
                 if let args = jsonGetString(jsonGet(fn, key: "arguments")) {
-                    toolCallArguments += args
+                    acc.arguments += args
+                    let eventId = acc.id ?? "call_\(idx)"
+                    onEvent(.toolCallDelta(id: eventId, argsDelta: args))
+                }
+                toolCallAccumulators[idx] = acc
+
+                let eventId = acc.id ?? "call_\(idx)"
+                if utf8IsEmpty(priorName) && !utf8IsEmpty(acc.functionName) {
+                    onEvent(.toolCallStart(id: eventId, toolName: acc.functionName))
                 }
             }
         }
 
         if inReasoning {
-            print("\n\u{001B}[0m")
+            onEvent(.thinkingEnd(fullText: thinkingAccumulator))
+        }
+        if inText {
+            onEvent(.textEnd(fullText: contentAccumulator))
         }
 
-        if !utf8IsEmpty(contentAccumulator) {
-            print("")
+        var resultToolCalls: [ToolCall] = []
+        for acc in toolCallAccumulators {
+            let id = acc.id ?? "call_\(c_rand())"
+            onEvent(.toolCallEnd(id: id, toolName: acc.functionName, fullArgs: acc.arguments))
+            resultToolCalls.append(ToolCall(id: id, functionName: acc.functionName, arguments: acc.arguments))
         }
 
         if let errorMessage = errorMessage {
-            return ChatMessage(role: "assistant", content: "api-error: \(errorMessage)")
+            onEvent(.done(reason: .stop))
+            return StreamResult(contentText: nil, thinkingText: nil, toolCalls: [], stopReason: .stop, errorMessage: errorMessage)
         }
-
         if status < 0 {
-            return ChatMessage(role: "assistant", content: "http-error: curl request failed")
+            let msg = "http-error: curl request failed"
+            onEvent(.error(message: msg))
+            return StreamResult(contentText: nil, thinkingText: nil, toolCalls: [], stopReason: .stop, errorMessage: msg)
         }
-
         if status != 200 {
-            return ChatMessage(role: "assistant", content: "http-error: status \(status)")
+            let msg = "http-error: status \(status)"
+            onEvent(.error(message: msg))
+            return StreamResult(contentText: nil, thinkingText: nil, toolCalls: [], stopReason: .stop, errorMessage: msg)
         }
 
-        if hasToolCall {
-            let id = toolCallId ?? "call_\(c_rand())"
-            let tc = ToolCall(
-                id: id,
-                functionName: toolCallFunctionName,
-                arguments: toolCallArguments
-            )
-            return ChatMessage(role: "assistant", content: nil, toolCalls: [tc])
-        }
+        let reason: StopReason = resultToolCalls.isEmpty ? .stop : .toolUse
+        onEvent(.done(reason: reason))
 
-        return ChatMessage(role: "assistant", content: contentAccumulator)
+        return StreamResult(
+            contentText: utf8IsEmpty(contentAccumulator) ? nil : contentAccumulator,
+            thinkingText: utf8IsEmpty(thinkingAccumulator) ? nil : thinkingAccumulator,
+            toolCalls: resultToolCalls,
+            stopReason: reason,
+            errorMessage: nil
+        )
+    }
+
+    private struct ToolCallAccumulator {
+        var id: String?
+        var functionName: String = ""
+        var arguments: String = ""
     }
 
     // MARK: - Request JSON Builder

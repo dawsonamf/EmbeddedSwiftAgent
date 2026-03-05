@@ -6,7 +6,9 @@ let platformLinkerFlags: [LinkerSetting] = [
     .unsafeFlags(["-use-ld=/usr/bin/ld"]),
 ]
 #else
-let platformLinkerFlags: [LinkerSetting] = []
+let platformLinkerFlags: [LinkerSetting] = [
+    .linkedLibrary("bsd"),
+]
 #endif
 
 let package = Package(

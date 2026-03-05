@@ -8,9 +8,11 @@ import Cstdio
 final class StreamContext {
     var buffer: [UInt8] = []
     var onLine: (String) -> Void
+    var abortFlag: AbortFlag?
 
-    init(onLine: @escaping (String) -> Void) {
+    init(onLine: @escaping (String) -> Void, abortFlag: AbortFlag? = nil) {
         self.onLine = onLine
+        self.abortFlag = abortFlag
     }
 }
 
@@ -21,6 +23,10 @@ private let curlWriteCallback: curl_write_callback = { (ptr: UnsafeMutablePointe
     guard let ptr = ptr, let userdata = userdata else { return 0 }
 
     let ctx = Unmanaged<StreamContext>.fromOpaque(userdata).takeUnretainedValue()
+    if let abortFlag = ctx.abortFlag, abortFlag.isSet() {
+        // Returning 0 tells curl to abort the transfer.
+        return 0
+    }
 
     for i in 0..<totalBytes {
         let byte = UInt8(bitPattern: ptr[i])
@@ -47,6 +53,7 @@ func httpPostStreaming(
     url: String,
     headers: [(String, String)],
     body: String,
+    abortFlag: AbortFlag? = nil,
     onLine: @escaping (String) -> Void
 ) -> Int32 {
     guard let curl = curl_easy_init() else { return -1 }
@@ -62,7 +69,7 @@ func httpPostStreaming(
     }
     curl_easy_setopt_slist(curl, CURLOPT_HTTPHEADER, headerList)
 
-    let ctx = StreamContext(onLine: onLine)
+    let ctx = StreamContext(onLine: onLine, abortFlag: abortFlag)
     let ctxPtr = Unmanaged.passRetained(ctx).toOpaque()
     defer { Unmanaged<StreamContext>.fromOpaque(ctxPtr).release() }
 

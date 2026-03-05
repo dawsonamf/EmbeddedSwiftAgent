@@ -1,0 +1,24 @@
+{
+  "configurations": [
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:SwiftCodeEmbedded}",
+      "name": "Debug SwiftCodeEmbedded",
+      "target": "SwiftCodeEmbedded",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug SwiftCodeEmbedded"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:SwiftCodeEmbedded}",
+      "name": "Release SwiftCodeEmbedded",
+      "target": "SwiftCodeEmbedded",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release SwiftCodeEmbedded"
+    }
+  ]
+}

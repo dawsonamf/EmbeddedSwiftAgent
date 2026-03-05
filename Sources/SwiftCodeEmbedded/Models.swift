@@ -1,5 +1,11 @@
 // MARK: - Chat Message
 
+enum ChatRole {
+    static let user = "user"
+    static let assistant = "assistant"
+    static let tool = "tool"
+}
+
 struct ChatMessage {
     var role: String
     var content: String?
@@ -76,5 +82,43 @@ struct ToolDefinition {
 
         jsonAddItemToObject(obj, key: "function", item: fn)
         return obj
+    }
+}
+
+// MARK: - Tool Result Message
+
+struct ToolResultMessage {
+    var toolCallId: String
+    var content: String
+    var isError: Bool
+
+    func toChatMessage() -> ChatMessage {
+        ChatMessage(
+            role: ChatRole.tool,
+            content: content,
+            toolCallId: toolCallId
+        )
+    }
+}
+
+// MARK: - Turn Result
+
+enum TurnResult {
+    case done
+    case `continue`
+    case exit
+}
+
+// MARK: - Stream Result
+
+struct StreamResult {
+    var contentText: String?
+    var thinkingText: String?
+    var toolCalls: [ToolCall]
+    var stopReason: StopReason
+    var errorMessage: String?
+
+    var isError: Bool {
+        errorMessage != nil
     }
 }

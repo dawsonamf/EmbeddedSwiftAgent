@@ -1,11 +1,11 @@
 # Build & Run
 
 ```
-c; xcrun swift build -c release && strip .build/release/SwiftCodeEmbedded; .build/release/SwiftCodeEmbedded
+swiftly run swift build -c release +main-snapshot; .build/release/SwiftCodeEmbedded
 ```
 
 # Check Binary Size
 
 ```
-cd SwiftCodeEmbedded && xcrun swift build -c release && ls -lh .build/release/SwiftCodeEmbedded
+swiftly run swift build -c release +main-snapshot && ls -lh .build/release/SwiftCodeEmbedded
 ```
