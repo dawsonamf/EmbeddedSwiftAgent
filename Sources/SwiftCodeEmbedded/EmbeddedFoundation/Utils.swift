@@ -81,6 +81,22 @@ func utf8Truncate(_ s: String, maxBytes: Int) -> String {
     return slice.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
 }
 
+/// Wraps a string in single quotes for safe shell interpolation.
+/// Any embedded single quotes are escaped as `'\''` (end quote, escaped quote, reopen quote).
+func shellEscape(_ s: String) -> String {
+    var out: [UInt8] = [0x27] // opening '
+    for byte in s.utf8 {
+        if byte == 0x27 { // single quote
+            out.append(contentsOf: [0x27, 0x5C, 0x27, 0x27]) // '\''
+        } else {
+            out.append(byte)
+        }
+    }
+    out.append(0x27) // closing '
+    out.append(0)
+    return out.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+}
+
 /// Trims leading and trailing ASCII whitespace (space, tab, CR, LF)
 func trimWhitespace(_ s: String) -> String {
     var bytes = Array(s.utf8)

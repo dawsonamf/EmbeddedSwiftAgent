@@ -7,6 +7,7 @@ guard let apiKeyCStr = getenv("OPENROUTER_API_KEY") else {
     exit(1)
 }
 let apiKey = String(cString: apiKeyCStr)
+let exaApiKey: String? = getenv("EXA_API_KEY").map { String(cString: $0) }
 let client = OpenRouterClient(apiKey: apiKey, model: "anthropic/claude-haiku-4.5")
 let tools = allTools
 
@@ -19,6 +20,7 @@ let tools = allTools
 struct AgentLoop: Sendable {
     let client: OpenRouterClient
     let apiKey: String
+    let exaApiKey: String?
     let tools: [ToolDefinition]
     let abortFlag: AbortFlag
     let onEvent: @Sendable (AgentEvent) -> Void
@@ -183,6 +185,7 @@ let inputReader = InputReader(
 let agentLoop = AgentLoop(
     client: client,
     apiKey: apiKey,
+    exaApiKey: exaApiKey,
     tools: tools,
     abortFlag: abortFlag,
     onEvent: renderEvent

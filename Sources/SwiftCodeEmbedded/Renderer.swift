@@ -43,6 +43,31 @@ func renderEventCore(_ event: AgentEvent, prefix: String) {
         if utf8Equal(toolName, "sh") {
             let command = extractShellCommand(from: args)
             print("\(prefix)\(ansiBlue)[running: \(command)]\(ansiReset)")
+        } else if utf8Equal(toolName, "read_file") {
+            let (path, _, _) = extractReadFileArgs(from: args)
+            print("\(prefix)\(ansiBlue)[reading: \(path)]\(ansiReset)")
+        } else if utf8Equal(toolName, "write_file") {
+            let (path, _) = extractWriteFileArgs(from: args)
+            print("\(prefix)\(ansiBlue)[writing: \(path)]\(ansiReset)")
+        } else if utf8Equal(toolName, "str_replace") {
+            let (path, _, _) = extractStrReplaceArgs(from: args)
+            print("\(prefix)\(ansiBlue)[editing: \(path)]\(ansiReset)")
+        } else if utf8Equal(toolName, "glob") {
+            let (pattern, _) = extractGlobArgs(from: args)
+            print("\(prefix)\(ansiBlue)[glob: \(pattern)]\(ansiReset)")
+        } else if utf8Equal(toolName, "grep") {
+            let (pattern, _, _) = extractGrepArgs(from: args)
+            print("\(prefix)\(ansiBlue)[grep: \(pattern)]\(ansiReset)")
+        } else if utf8Equal(toolName, "web_search") {
+            let (query, _) = extractWebSearchArgs(from: args)
+            let preview = utf8Truncate(query, maxBytes: 60)
+            print("\(prefix)\(ansiBlue)[searching: \(preview)]\(ansiReset)")
+        } else if utf8Equal(toolName, "web_fetch") {
+            let (url, _) = extractWebFetchArgs(from: args)
+            print("\(prefix)\(ansiBlue)[fetching: \(url)]\(ansiReset)")
+        } else if utf8Equal(toolName, "mcp") {
+            let (server, tool, _) = extractMcpArgs(from: args)
+            print("\(prefix)\(ansiBlue)[mcp: \(server)/\(tool)]\(ansiReset)")
         }
 
     case .toolExecEnd(_, let toolName, let result, let isError):
