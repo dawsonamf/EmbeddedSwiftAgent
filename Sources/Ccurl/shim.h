@@ -33,4 +33,8 @@ static inline CURLcode curl_easy_getinfo_long(CURL *curl, CURLINFO info, long *v
     return curl_easy_getinfo(curl, info, value);
 }
 
+static inline const char *curl_easy_strerror_wrapper(CURLcode code) {
+    return curl_easy_strerror(code);
+}
+
 #endif

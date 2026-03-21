@@ -59,10 +59,24 @@ func utf8Equal(_ a: String, _ b: String) -> Bool {
     }
 }
 
+/// Drops the first `n` UTF-8 bytes from `s`.
+/// Callers must ensure `n` lands on a UTF-8 character boundary (i.e. not in the
+/// middle of a multi-byte sequence). Safe for ASCII-only offsets like SSE prefix stripping.
 func utf8DropFirst(_ s: String, _ n: Int) -> String {
     let bytes = Array(s.utf8)
     guard n < bytes.count else { return "" }
     var slice = Array(bytes[n...])
+    slice.append(0)
+    return slice.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+}
+
+/// Truncates a string to at most `maxBytes` UTF-8 bytes, appending "..." if truncated.
+/// Avoids String.count / String.prefix which pull in Unicode grapheme tables.
+func utf8Truncate(_ s: String, maxBytes: Int) -> String {
+    let bytes = Array(s.utf8)
+    guard bytes.count > maxBytes else { return s }
+    var slice = Array(bytes[..<maxBytes])
+    slice.append(contentsOf: [0x2E, 0x2E, 0x2E]) // "..."
     slice.append(0)
     return slice.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
 }

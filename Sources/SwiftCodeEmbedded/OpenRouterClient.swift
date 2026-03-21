@@ -1,5 +1,9 @@
 import Cstdio
 
+enum StreamPhase {
+    case idle, thinking, text, toolCall
+}
+
 struct OpenRouterClient {
     let apiKey: String
     let model: String
@@ -28,23 +32,22 @@ struct OpenRouterClient {
 
         var contentAccumulator = ""
         var thinkingAccumulator = ""
-        // Phase: 0=idle, 1=thinking, 2=text, 3=toolCall
-        var phase = 0
+        var phase: StreamPhase = .idle
         var toolCallAccumulators: [ToolCallAccumulator] = []
         var errorMessage: String?
 
         func closePhase() {
             switch phase {
-            case 1: onEvent(.thinkingEnd(fullText: thinkingAccumulator))
-            case 2: onEvent(.textEnd(fullText: contentAccumulator))
-            default: break
+            case .thinking: onEvent(.thinkingEnd(fullText: thinkingAccumulator))
+            case .text: onEvent(.textEnd(fullText: contentAccumulator))
+            case .idle, .toolCall: break
             }
-            phase = 0
+            phase = .idle
         }
 
         onEvent(.start)
 
-        let status = httpPostStreaming(url: endpoint, headers: headers, body: bodyString, abortFlag: abortFlag) { line in
+        let httpResult = httpPostStreaming(url: endpoint, headers: headers, body: bodyString, abortFlag: abortFlag) { line in
             let trimmed = trimWhitespace(line)
             guard utf8HasPrefix(trimmed, "data: ") else { return }
             let payload = utf8DropFirst(trimmed, 6)
@@ -52,49 +55,47 @@ struct OpenRouterClient {
 
             guard let chunk = jsonParse(payload) else { return }
 
-            if let errorObj = jsonGet(chunk, key: "error") {
-                if let msg = jsonGetString(jsonGet(errorObj, key: "message")) {
+            if let errorObj = chunk["error"] {
+                if let msg = errorObj["message"]?.string {
                     errorMessage = msg
                     onEvent(.error(message: msg))
                 }
                 return
             }
 
-            let choices = jsonGet(chunk, key: "choices")
-            guard let firstChoice = jsonGetArrayElements(choices).first else { return }
+            guard let firstChoice = chunk["choices"]?.arrayElements.first else { return }
 
-            let delta = jsonGet(firstChoice, key: "delta")
+            let delta = firstChoice["delta"]
 
-            let reasoningText = jsonGetString(jsonGet(delta, key: "reasoning"))
-                ?? jsonGetString(jsonGet(delta, key: "reasoning_content"))
+            let reasoningText = delta?["reasoning"]?.string
+                ?? delta?["reasoning_content"]?.string
             if let reasoning = reasoningText, !utf8IsEmpty(reasoning) {
-                if phase != 1 {
+                if phase != .thinking {
                     closePhase()
-                    phase = 1
+                    phase = .thinking
                     onEvent(.thinkingStart)
                 }
                 thinkingAccumulator += reasoning
                 onEvent(.thinkingDelta(text: reasoning))
             }
 
-            if let text = jsonGetString(jsonGet(delta, key: "content")), !utf8IsEmpty(text) {
-                if phase != 2 {
+            if let text = delta?["content"]?.string, !utf8IsEmpty(text) {
+                if phase != .text {
                     closePhase()
-                    phase = 2
+                    phase = .text
                     onEvent(.textStart)
                 }
                 contentAccumulator += text
                 onEvent(.textDelta(text: text))
             }
 
-            let toolCallsArray = jsonGet(delta, key: "tool_calls")
-            let toolCallElements = jsonGetArrayElements(toolCallsArray)
-            if !toolCallElements.isEmpty && phase != 3 {
+            let toolCallElements = delta?["tool_calls"]?.arrayElements ?? []
+            if !toolCallElements.isEmpty && phase != .toolCall {
                 closePhase()
-                phase = 3
+                phase = .toolCall
             }
             for tc in toolCallElements {
-                let rawIndex = jsonGetInt(jsonGet(tc, key: "index")) ?? 0
+                let rawIndex = tc["index"]?.int ?? 0
                 let idx = rawIndex < 0 ? 0 : rawIndex
                 while toolCallAccumulators.count <= idx {
                     toolCallAccumulators.append(ToolCallAccumulator())
@@ -102,15 +103,15 @@ struct OpenRouterClient {
                 var acc = toolCallAccumulators[idx]
                 let priorName = acc.functionName
 
-                if let id = jsonGetString(jsonGet(tc, key: "id")), !utf8IsEmpty(id) {
+                if let id = tc["id"]?.string, !utf8IsEmpty(id) {
                     acc.id = id
                 }
 
-                let fn = jsonGet(tc, key: "function")
-                if let name = jsonGetString(jsonGet(fn, key: "name")) {
+                let fn = tc["function"]
+                if let name = fn?["name"]?.string {
                     acc.functionName += name
                 }
-                if let args = jsonGetString(jsonGet(fn, key: "arguments")) {
+                if let args = fn?["arguments"]?.string {
                     acc.arguments += args
                     let eventId = acc.id ?? "call_\(idx)"
                     onEvent(.toolCallDelta(id: eventId, argsDelta: args))
@@ -137,13 +138,13 @@ struct OpenRouterClient {
             onEvent(.done(reason: .stop))
             return StreamResult(contentText: nil, thinkingText: nil, toolCalls: [], stopReason: .stop, errorMessage: errorMessage)
         }
-        if status < 0 {
-            let msg = "http-error: curl request failed"
+        if let curlError = httpResult.curlError {
+            let msg = "http-error: \(curlError)"
             onEvent(.error(message: msg))
             return StreamResult(contentText: nil, thinkingText: nil, toolCalls: [], stopReason: .stop, errorMessage: msg)
         }
-        if status != 200 {
-            let msg = "http-error: status \(status)"
+        if httpResult.statusCode != 200 {
+            let msg = "http-error: status \(httpResult.statusCode)"
             onEvent(.error(message: msg))
             return StreamResult(contentText: nil, thinkingText: nil, toolCalls: [], stopReason: .stop, errorMessage: msg)
         }
@@ -172,30 +173,14 @@ struct OpenRouterClient {
         messages: [ChatMessage],
         tools: [ToolDefinition]
     ) -> JSONValue? {
-        let root = jsonCreateObject()
-
-        jsonAddItemToObject(root, key: "model", item: jsonCreateString(model))
-        jsonAddItemToObject(root, key: "stream", item: jsonCreateBool(true))
-
-        // Reasoning
-        let reasoning = jsonCreateObject()
-        jsonAddItemToObject(reasoning, key: "effort", item: jsonCreateString("high"))
-        jsonAddItemToObject(root, key: "reasoning", item: reasoning)
-
-        let messagesArray = jsonCreateArray()
-        for msg in messages {
-            jsonAddItemToArray(messagesArray, item: msg.toJSON())
-        }
-        jsonAddItemToObject(root, key: "messages", item: messagesArray)
-
+        let root = JSONValue.object()
+        root?["model"] = .string(model)
+        root?["stream"] = .bool(true)
+        root?["reasoning"] = .object(("effort", .string("high")))
+        root?["messages"] = .array(messages.map { $0.toJSON() })
         if !tools.isEmpty {
-            let toolsArray = jsonCreateArray()
-            for tool in tools {
-                jsonAddItemToArray(toolsArray, item: tool.toJSON())
-            }
-            jsonAddItemToObject(root, key: "tools", item: toolsArray)
+            root?["tools"] = .array(tools.map { $0.toJSON() })
         }
-
         return root
     }
 }

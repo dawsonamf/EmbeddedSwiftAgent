@@ -1,5 +1,8 @@
 // MARK: - Chat Message
 
+/// String constants for OpenRouter role values.
+/// Not a RawRepresentable enum because embedded Swift lacks the runtime support
+/// for String-backed enums. ChatMessage.role is typed as String for direct JSON serialization.
 enum ChatRole {
     static let user = "user"
     static let assistant = "assistant"
@@ -13,27 +16,14 @@ struct ChatMessage {
     var toolCallId: String?
 
     func toJSON() -> JSONValue? {
-        let obj = jsonCreateObject()
-        jsonAddItemToObject(obj, key: "role", item: jsonCreateString(role))
-
-        if let content = content {
-            jsonAddItemToObject(obj, key: "content", item: jsonCreateString(content))
-        } else {
-            jsonAddItemToObject(obj, key: "content", item: jsonCreateNull())
-        }
-
+        let obj = JSONValue.object(
+            ("role", .string(role)),
+            ("content", content.flatMap { .string($0) } ?? .null()),
+            ("tool_call_id", toolCallId.flatMap { .string($0) })
+        )
         if let toolCalls = toolCalls, !toolCalls.isEmpty {
-            let arr = jsonCreateArray()
-            for tc in toolCalls {
-                jsonAddItemToArray(arr, item: tc.toJSON())
-            }
-            jsonAddItemToObject(obj, key: "tool_calls", item: arr)
+            obj?["tool_calls"] = JSONValue.array(toolCalls.map { $0.toJSON() })
         }
-
-        if let toolCallId = toolCallId {
-            jsonAddItemToObject(obj, key: "tool_call_id", item: jsonCreateString(toolCallId))
-        }
-
         return obj
     }
 }
@@ -46,16 +36,14 @@ struct ToolCall {
     var arguments: String
 
     func toJSON() -> JSONValue? {
-        let obj = jsonCreateObject()
-        jsonAddItemToObject(obj, key: "id", item: jsonCreateString(id))
-        jsonAddItemToObject(obj, key: "type", item: jsonCreateString("function"))
-
-        let fn = jsonCreateObject()
-        jsonAddItemToObject(fn, key: "name", item: jsonCreateString(functionName))
-        jsonAddItemToObject(fn, key: "arguments", item: jsonCreateString(arguments))
-        jsonAddItemToObject(obj, key: "function", item: fn)
-
-        return obj
+        .object(
+            ("id", .string(id)),
+            ("type", .string("function")),
+            ("function", .object(
+                ("name", .string(functionName)),
+                ("arguments", .string(arguments))
+            ))
+        )
     }
 }
 
@@ -68,20 +56,14 @@ struct ToolDefinition {
     var parametersJSON: String
 
     func toJSON() -> JSONValue? {
-        let obj = jsonCreateObject()
-        jsonAddItemToObject(obj, key: "type", item: jsonCreateString("function"))
-
-        let fn = jsonCreateObject()
-        jsonAddItemToObject(fn, key: "name", item: jsonCreateString(name))
-        jsonAddItemToObject(fn, key: "description", item: jsonCreateString(description))
-
-        // Parse the pre-serialized parameters JSON and attach as a real object
-        if let params = jsonParse(parametersJSON) {
-            jsonAddItemToObject(fn, key: "parameters", item: params)
-        }
-
-        jsonAddItemToObject(obj, key: "function", item: fn)
-        return obj
+        .object(
+            ("type", .string("function")),
+            ("function", .object(
+                ("name", .string(name)),
+                ("description", .string(description)),
+                ("parameters", jsonParse(parametersJSON))
+            ))
+        )
     }
 }
 

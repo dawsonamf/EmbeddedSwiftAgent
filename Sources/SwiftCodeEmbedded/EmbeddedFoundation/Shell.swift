@@ -1,9 +1,14 @@
 import Cstdio
 
-func runShell(_ command: String) -> String {
+struct ShellResult {
+    let output: String
+    let exitCode: Int32
+}
+
+func runShell(_ command: String) -> ShellResult {
     var pipeFds = [Int32](repeating: 0, count: 2)
     guard pipe(&pipeFds) == 0 else {
-        return "shell-error: pipe() failed"
+        return ShellResult(output: "shell-error: pipe() failed", exitCode: -1)
     }
     let readEnd = pipeFds[0]
     let writeEnd = pipeFds[1]
@@ -19,12 +24,10 @@ func runShell(_ command: String) -> String {
     posix_spawn_file_actions_addclose(&fileActions, readEnd)
     posix_spawn_file_actions_addclose(&fileActions, writeEnd)
 
-    // The trailing ";:" ensures a zero exit status even if the command fails
-    let shellCmd = command + ";:"
     let argv: [UnsafeMutablePointer<CChar>?] = [
         strdup("/bin/sh"),
         strdup("-c"),
-        strdup(shellCmd),
+        strdup(command),
         nil
     ]
     defer { for arg in argv { if let arg = arg { free(arg) } } }
@@ -39,7 +42,7 @@ func runShell(_ command: String) -> String {
 
     guard spawnResult == 0 else {
         close(readEnd)
-        return "shell-error: posix_spawn failed with code \(spawnResult)"
+        return ShellResult(output: "shell-error: posix_spawn failed with code \(spawnResult)", exitCode: -1)
     }
 
     var output: [UInt8] = []
@@ -54,6 +57,16 @@ func runShell(_ command: String) -> String {
     var status: Int32 = 0
     waitpid(pid, &status, 0)
 
+    let exitCode: Int32
+    if (status & 0x7f) == 0 {
+        // WIFEXITED — normal exit
+        exitCode = (status >> 8) & 0xff
+    } else {
+        // Killed by signal
+        exitCode = -(status & 0x7f)
+    }
+
     output.append(0)
-    return output.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+    let outputStr = output.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+    return ShellResult(output: outputStr, exitCode: exitCode)
 }

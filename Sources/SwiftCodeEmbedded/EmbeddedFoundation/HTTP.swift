@@ -5,6 +5,10 @@ import Cstdio
 
 /// Context passed through CURLOPT_WRITEDATA to the C write callback.
 /// Buffers incoming bytes and invokes `onLine` for each complete line.
+///
+/// Thread-safety: this is only safe because `curl_easy_perform` calls the write
+/// callback synchronously on the calling thread. A switch to `curl_multi` would
+/// require synchronization around `buffer` and `onLine`.
 final class StreamContext {
     var buffer: [UInt8] = []
     var onLine: (String) -> Void
@@ -45,9 +49,14 @@ private let curlWriteCallback: curl_write_callback = { (ptr: UnsafeMutablePointe
     return totalBytes
 }
 
+struct HTTPResult {
+    let statusCode: Int32
+    /// Non-nil when curl itself failed (network error, DNS failure, etc.)
+    let curlError: String?
+}
+
 /// Performs a streaming HTTP POST. Calls `onLine` for each newline-delimited
 /// chunk received from the server (designed for SSE consumption).
-/// Returns the HTTP status code, or -1 on curl failure.
 @discardableResult
 func httpPostStreaming(
     url: String,
@@ -55,8 +64,10 @@ func httpPostStreaming(
     body: String,
     abortFlag: AbortFlag? = nil,
     onLine: @escaping (String) -> Void
-) -> Int32 {
-    guard let curl = curl_easy_init() else { return -1 }
+) -> HTTPResult {
+    guard let curl = curl_easy_init() else {
+        return HTTPResult(statusCode: -1, curlError: "curl_easy_init failed")
+    }
     defer { curl_easy_cleanup(curl) }
 
     _ = url.withCString { curl_easy_setopt_string(curl, CURLOPT_URL, $0) }
@@ -88,10 +99,11 @@ func httpPostStreaming(
     curl_slist_free_all(headerList)
 
     if result != CURLE_OK {
-        return -1
+        let errStr = String(cString: curl_easy_strerror_wrapper(result))
+        return HTTPResult(statusCode: -1, curlError: errStr)
     }
 
     var statusCode: CLong = 0
     curl_easy_getinfo_long(curl, CURLINFO_RESPONSE_CODE, &statusCode)
-    return Int32(statusCode)
+    return HTTPResult(statusCode: Int32(statusCode), curlError: nil)
 }

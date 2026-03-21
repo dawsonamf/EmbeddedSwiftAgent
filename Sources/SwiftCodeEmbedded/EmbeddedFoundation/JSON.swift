@@ -35,6 +35,120 @@ final class JSONValue: @unchecked Sendable {
     deinit {
         if owned { cJSON_Delete(pointer) }
     }
+
+    // MARK: - Accessors
+
+    subscript(key: String) -> JSONValue? {
+        get {
+            guard let ptr = key.withCString({ cJSON_GetObjectItemCaseSensitive(self.pointer, $0) }) else { return nil }
+            return .borrowing(ptr, root: self)
+        }
+        set {
+            guard let newValue else { return }
+            _ = key.withCString { cJSON_AddItemToObject(self.pointer, $0, newValue.pointer) }
+            newValue.relinquishOwnership()
+        }
+    }
+
+    var string: String? {
+        guard cJSON_IsString(pointer) != 0, let vs = pointer.pointee.valuestring else { return nil }
+        return String(cString: vs)
+    }
+
+    var double: Double? {
+        guard cJSON_IsNumber(pointer) != 0 else { return nil }
+        return pointer.pointee.valuedouble
+    }
+
+    var int: Int? {
+        guard let d = self.double else { return nil }
+        return Int(d)
+    }
+
+    var bool: Bool? {
+        if cJSON_IsTrue(pointer) != 0 { return true }
+        if cJSON_IsFalse(pointer) != 0 { return false }
+        return nil
+    }
+
+    var isNull: Bool {
+        cJSON_IsNull(pointer) != 0
+    }
+
+    var arrayElements: [JSONValue] {
+        guard cJSON_IsArray(pointer) != 0 else { return [] }
+        var result: [JSONValue] = []
+        var child = pointer.pointee.child
+        while let c = child {
+            result.append(.borrowing(c, root: self))
+            child = c.pointee.next
+        }
+        return result
+    }
+
+    // MARK: - Static Factories
+
+    static func string(_ value: String) -> JSONValue? {
+        guard let ptr = value.withCString({ cJSON_CreateString($0) }) else { return nil }
+        return .owned(ptr)
+    }
+
+    static func number(_ value: Double) -> JSONValue? {
+        guard let ptr = cJSON_CreateNumber(value) else { return nil }
+        return .owned(ptr)
+    }
+
+    static func number(_ value: Int) -> JSONValue? {
+        guard let ptr = cJSON_CreateNumber(Double(value)) else { return nil }
+        return .owned(ptr)
+    }
+
+    static func bool(_ value: Bool) -> JSONValue? {
+        guard let ptr = cJSON_CreateBool(value ? 1 : 0) else { return nil }
+        return .owned(ptr)
+    }
+
+    static func null() -> JSONValue? {
+        guard let ptr = cJSON_CreateNull() else { return nil }
+        return .owned(ptr)
+    }
+
+    static func raw(_ rawJSON: String) -> JSONValue? {
+        guard let ptr = rawJSON.withCString({ cJSON_CreateRaw($0) }) else { return nil }
+        return .owned(ptr)
+    }
+
+    // MARK: - Declarative Builders
+
+    /// Create an empty JSON object for imperative building via subscript setter.
+    static func object() -> JSONValue? {
+        guard let ptr = cJSON_CreateObject() else { return nil }
+        return .owned(ptr)
+    }
+
+    /// Build a JSON object from key-value pairs. Nil values are silently omitted.
+    static func object(_ pairs: (String, JSONValue?)...) -> JSONValue? {
+        guard let ptr = cJSON_CreateObject() else { return nil }
+        let obj = JSONValue.owned(ptr)
+        for (key, value) in pairs {
+            guard let value = value else { continue }
+            _ = key.withCString { cJSON_AddItemToObject(obj.pointer, $0, value.pointer) }
+            value.relinquishOwnership()
+        }
+        return obj
+    }
+
+    /// Build a JSON array from elements. Nil values are silently omitted.
+    static func array(_ elements: [JSONValue?]) -> JSONValue? {
+        guard let ptr = cJSON_CreateArray() else { return nil }
+        let arr = JSONValue.owned(ptr)
+        for element in elements {
+            guard let element = element else { continue }
+            cJSON_AddItemToArray(arr.pointer, element.pointer)
+            element.relinquishOwnership()
+        }
+        return arr
+    }
 }
 
 // MARK: - Parsing

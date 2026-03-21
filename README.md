@@ -25,10 +25,11 @@ swiftly run swift build -c release +main-snapshot; .build/release/SwiftCodeEmbed
 Runs three phases:
 
 1. **Build** — compiles release binaries for macOS and Linux (via Docker) in parallel, reports stripped binary sizes
-2. **Agent tests** — sends real prompts through the built binary to verify:
+2. **Agent tests** — sends real prompts through the built binary in parallel to verify:
    - Plain response (agent replies and returns to prompt)
    - Tool call success (agent runs `uuidgen` and returns a UUID)
    - Tool call failure (agent survives a bad command without crashing)
+   - Subagent (spawns two subagents, each runs a command, main agent combines output)
 3. **Teardown** — cleans up build artifacts
 
 Agent tests require `OPENROUTER_API_KEY`. Linux build requires Docker (skipped if unavailable).
@@ -37,5 +38,5 @@ Agent tests require `OPENROUTER_API_KEY`. Linux build requires Docker (skipped i
 
 | Target | Stripped |
 |---|---|
-| macOS arm64 | ~108 KB |
+| macOS arm64 | ~148 KB |
 | Linux aarch64 | ~131 KB |

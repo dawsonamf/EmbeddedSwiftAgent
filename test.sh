@@ -8,10 +8,13 @@ DIM='\033[2m'
 RESET='\033[0m'
 
 BINARY_NAME="SwiftCodeEmbedded"
-BINARY_PATH=".build/release/$BINARY_NAME"
+SCRATCH="/tmp/swiftcode-build"
+BINARY_PATH="$SCRATCH/arm64-apple-macosx/release/$BINARY_NAME"
 MAC_LOG=$(mktemp)
 LINUX_LOG=$(mktemp)
-trap 'rm -f "$MAC_LOG" "$LINUX_LOG"' EXIT
+SMOKE_DIR=$(mktemp -d)
+SMOKE_LOCK="$SMOKE_DIR/.lock"
+trap 'rm -f "$MAC_LOG" "$LINUX_LOG"; rm -rf "$SMOKE_DIR"' EXIT
 
 human_size() {
     local bytes=$1
@@ -47,7 +50,7 @@ stop_spinner() {
 }
 
 build_mac() {
-    if BUILD_OUTPUT=$(swiftly run swift build -c release +main-snapshot 2>&1); then
+    if BUILD_OUTPUT=$(swiftly run swift build -c release +main-snapshot --scratch-path "$SCRATCH" --disable-sandbox 2>&1); then
         cp "$BINARY_PATH" "${BINARY_PATH}.stripped"
         strip "${BINARY_PATH}.stripped" 2>/dev/null || true
         local stripped
@@ -55,8 +58,8 @@ build_mac() {
         rm -f "${BINARY_PATH}.stripped"
         echo "PASS:$stripped"
     else
-        swiftly run swift package clean +main-snapshot 2>/dev/null || true
-        rm -rf .build
+        swiftly run swift package clean +main-snapshot --scratch-path "$SCRATCH" 2>/dev/null || true
+        rm -rf "$SCRATCH"
         echo "FAIL"
         echo "$BUILD_OUTPUT"
     fi
@@ -141,7 +144,8 @@ if $MAC_BUILT; then
         echo -e "${DIM}–${RESET} ${BOLD}plain response${RESET}  ${DIM}OPENROUTER_API_KEY not set (skipped)${RESET}"
         echo -e "${DIM}–${RESET} ${BOLD}tool call success${RESET}  ${DIM}OPENROUTER_API_KEY not set (skipped)${RESET}"
         echo -e "${DIM}–${RESET} ${BOLD}tool call failure${RESET}  ${DIM}OPENROUTER_API_KEY not set (skipped)${RESET}"
-        SKIP=$((SKIP + 3))
+        echo -e "${DIM}–${RESET} ${BOLD}subagent${RESET}  ${DIM}OPENROUTER_API_KEY not set (skipped)${RESET}"
+        SKIP=$((SKIP + 4))
     else
         match() {
             local pattern="$1" text="$2"
@@ -151,6 +155,7 @@ if $MAC_BUILT; then
                 printf "%s" "$text" | grep -Eq "$pattern"
             fi
         }
+        export -f match
 
         strip_ansi() {
             if command -v perl >/dev/null 2>&1; then
@@ -159,76 +164,123 @@ if $MAC_BUILT; then
                 sed $'s/\x1b\[[0-9;]*m//g'
             fi
         }
+        export -f strip_ansi
 
         run_case() {
             local prompt="$1"
             printf "%s" "$prompt" | OPENROUTER_API_KEY="$OPENROUTER_API_KEY" "$BINARY_PATH" 2>&1 | strip_ansi
         }
+        export -f run_case
 
-        fail_test() {
-            stop_spinner
-            printf "${RED}✗${RESET} ${BOLD}%s${RESET}\n" "$1" >&2
-            FAIL=$((FAIL + 1))
+        # Print a result line above the spinner (mkdir-based spinlock for macOS compat)
+        smoke_print() {
+            local line="$1" status="$2" status_file="$3"
+            while ! mkdir "$SMOKE_LOCK" 2>/dev/null; do sleep 0.05; done
+            printf "\r\033[K%b\n" "$line"
+            printf "\r${DIM}  ⠋ Running smoke tests...${RESET}"
+            echo "$status" > "$status_file"
+            rmdir "$SMOKE_LOCK"
         }
 
-        pass_test() {
-            stop_spinner
-            printf "${GREEN}✓${RESET} ${BOLD}%s${RESET}\n" "$1"
-            PASS=$((PASS + 1))
+        smoke_pass() {
+            smoke_print "$(printf "${GREEN}✓${RESET} ${BOLD}%s${RESET}" "$1")" "PASS" "$2"
         }
 
-        skip_test() {
-            printf "${DIM}–${RESET} ${BOLD}%s${RESET}  ${DIM}%s (skipped)${RESET}\n" "$1" "$2"
-            SKIP=$((SKIP + 1))
+        smoke_fail() {
+            smoke_print "$(printf "${RED}✗${RESET} ${BOLD}%s${RESET}" "$1")" "FAIL" "$2"
         }
 
-        # 1) Plain response — agent replies and shows prompt marker
-        start_spinner "Testing plain response"
-        out="$(run_case $'hi!\n')"
-        if [[ "$out" == *"> " ]]; then
-            pass_test "plain response"
-        else
-            fail_test "plain response — prompt marker missing"
-        fi
+        # Each test is a function that prints immediately and writes status to a file
 
-        # 2) Tool success — agent runs uuidgen and returns a UUID
-        start_spinner "Testing tool call success"
-        out="$(run_case $'Use your sh tool to run exactly: uuidgen\nReturn only command output.\n')"
-        if match "[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}" "$out" && [[ "$out" == *"> " ]]; then
-            pass_test "tool call success"
-        else
-            fail_test "tool call success — uuidgen output or prompt marker missing"
-        fi
+        test_plain_response() {
+            local status_file="$SMOKE_DIR/1"
+            local out
+            out="$(run_case $'hi!\n')"
+            if [[ "$out" == *"> " ]]; then
+                smoke_pass "plain response" "$status_file"
+            else
+                smoke_fail "plain response — prompt marker missing" "$status_file"
+            fi
+        }
 
-        # 3) Tool failure — agent survives a bad command
-        start_spinner "Testing tool call failure"
-        set +e
-        out="$(run_case $'Use your sh tool to run exactly: command_not_found_xyz\nReturn only what happened.\n')"
-        exit_code=$?
-        set -e
+        test_tool_success() {
+            local status_file="$SMOKE_DIR/2"
+            local out
+            out="$(run_case $'Use your sh tool to run exactly: uuidgen\nReturn only command output.\n')"
+            if match "[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}" "$out" && [[ "$out" == *"> " ]]; then
+                smoke_pass "tool call success" "$status_file"
+            else
+                smoke_fail "tool call success — uuidgen output or prompt marker missing" "$status_file"
+            fi
+        }
 
-        if [[ $exit_code -ne 0 ]]; then
-            fail_test "tool call failure — agent crashed (exit $exit_code)"
-        elif match "Fatal error|Swift runtime" "$out"; then
-            fail_test "tool call failure — crash detected in output"
-        elif [[ "$out" != *"> " ]]; then
-            fail_test "tool call failure — prompt marker missing"
-        else
-            pass_test "tool call failure"
-        fi
+        test_tool_failure() {
+            local status_file="$SMOKE_DIR/3"
+            local out exit_code
+            set +e
+            out="$(run_case $'Use your sh tool to run exactly: command_not_found_xyz\nReturn only what happened.\n')"
+            exit_code=$?
+            set -e
+
+            if [[ $exit_code -ne 0 ]]; then
+                smoke_fail "tool call failure — agent crashed (exit $exit_code)" "$status_file"
+            elif match "Fatal error|Swift runtime" "$out"; then
+                smoke_fail "tool call failure — crash detected in output" "$status_file"
+            elif [[ "$out" != *"> " ]]; then
+                smoke_fail "tool call failure — prompt marker missing" "$status_file"
+            else
+                smoke_pass "tool call failure" "$status_file"
+            fi
+        }
+
+        test_subagent() {
+            local status_file="$SMOKE_DIR/4"
+            local out
+            out="$(run_case $'You MUST use the subagent tool exactly twice, in parallel (both in the same tool call). First subagent task: "Run sh with command: echo hello_world_1" — second subagent task: "Run sh with command: echo hello_world_2". Do not skip the subagent tool. After both complete, state their results exactly as-is with no modifications.\n')"
+            if match "hello_world_1" "$out" && match "hello_world_2" "$out" && [[ "$out" == *"> " ]]; then
+                smoke_pass "subagent" "$status_file"
+            else
+                smoke_fail "subagent — expected hello_world_1 and hello_world_2 in output" "$status_file"
+            fi
+        }
+
+        # Run all smoke tests in parallel (results print above the spinner)
+        start_spinner "Running smoke tests..."
+        test_plain_response &
+        SMOKE_PIDS="$!"
+        test_tool_success &
+        SMOKE_PIDS="$SMOKE_PIDS $!"
+        test_tool_failure &
+        SMOKE_PIDS="$SMOKE_PIDS $!"
+        test_subagent &
+        SMOKE_PIDS="$SMOKE_PIDS $!"
+        for pid in $SMOKE_PIDS; do wait "$pid" 2>/dev/null || true; done
+        stop_spinner
+
+        # Tally results from status files
+        for f in "$SMOKE_DIR"/[0-9]*; do
+            [[ -f "$f" ]] || continue
+            status=$(<"$f")
+            if [[ "$status" == "PASS" ]]; then
+                PASS=$((PASS + 1))
+            else
+                FAIL=$((FAIL + 1))
+            fi
+        done
     fi
 else
     echo ""
     echo -e "${DIM}–${RESET} ${BOLD}plain response${RESET}  ${DIM}macOS build failed (skipped)${RESET}"
     echo -e "${DIM}–${RESET} ${BOLD}tool call success${RESET}  ${DIM}macOS build failed (skipped)${RESET}"
     echo -e "${DIM}–${RESET} ${BOLD}tool call failure${RESET}  ${DIM}macOS build failed (skipped)${RESET}"
-    SKIP=$((SKIP + 3))
+    echo -e "${DIM}–${RESET} ${BOLD}subagent${RESET}  ${DIM}macOS build failed (skipped)${RESET}"
+    SKIP=$((SKIP + 4))
 fi
 
 # ── Teardown ─────────────────────────────────────────────────
 
 start_spinner "Tearing down"
-rm -rf .build 2>/dev/null || true
+rm -rf "$SCRATCH" 2>/dev/null || true
 stop_spinner
 
 SUMMARY="${GREEN}$PASS passed${RESET}, ${RED}$FAIL failed${RESET}"

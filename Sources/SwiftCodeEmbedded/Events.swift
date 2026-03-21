@@ -36,7 +36,7 @@ enum StreamEvent {
 
 /// Emitted by `AgentLoop` during agent orchestration.
 /// Wraps Layer 1 events and adds tool execution, turn, and agent lifecycle events.
-enum AgentEvent {
+indirect enum AgentEvent {
     // Agent lifecycle (one per user message)
     case agentStart
     case agentEnd(messages: [ChatMessage])
@@ -57,6 +57,11 @@ enum AgentEvent {
     // Steering
     case steeringReceived
     case toolCallSkipped(id: String, toolName: String, reason: String)
+
+    // Subagent
+    case subagentStart(task: String)
+    case subagentEnd
+    case subagentEvent(innerEvent: AgentEvent)
 
     // Abort
     case aborted
