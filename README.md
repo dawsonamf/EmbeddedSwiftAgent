@@ -1,10 +1,12 @@
 # SwiftCodeEmbedded
 
-Minimal coding agent CLI in Embedded Swift. No Foundation — just POSIX, cJSON, and libcurl. Streams LLM responses via OpenRouter and executes shell commands and tools in an agentic loop.
+A fully-featured coding agent in under 200 KB — written in Embedded Swift with no Foundation, no runtime, and no dependencies beyond POSIX, cJSON, and libcurl.
+
+**This agent was built with itself.** Once the core loop was functional (a plain Swift prototype with a shell command execution tool), I used the agent to port itself to Embedded Swift, strip out Foundation, and build every subsequent feature: file operations, parallel tool execution, subagents, streaming, web search, and more. Most of the code you see here was written with the agent running inside its own binary.
 
 ## What It Does
 
-An interactive REPL that takes natural-language prompts, sends them to an LLM, and autonomously executes tool calls in a loop until the task is done. The agent can run shell commands, read/write/edit files, search the web, spawn subagents, and more — all from a ~184 KB binary with zero Swift runtime overhead.
+An interactive REPL that takes natural-language prompts, sends them to an LLM via OpenRouter, and autonomously executes tool calls in a loop until the task is done. The agent can run shell commands, read/write/edit files, search the web, spawn subagents, and more. All from a ~184 KB binary with zero Swift runtime overhead.
 
 Key features:
 
