@@ -2,13 +2,20 @@ import Cstdio
 
 // MARK: - Configuration
 
-guard let apiKeyCStr = getenv("OPENROUTER_API_KEY") else {
-    writeStderr("Set OPENROUTER_API_KEY environment variable\n")
-    exit(1)
-}
-let apiKey = String(cString: apiKeyCStr)
-let exaApiKey: String? = getenv("EXA_API_KEY").map { String(cString: $0) }
-let client = OpenRouterClient(apiKey: apiKey, model: "anthropic/claude-haiku-4.5")
+let args = parseArgs()
+
+let apiKey: String = args.openrouterKey
+    ?? getenv("OPENROUTER_API_KEY").map({ String(cString: $0) })
+    ?? {
+        writeStderr("Set OPENROUTER_API_KEY via --openrouter-key flag or as an environment variable\n")
+        exit(1)
+    }()
+
+let exaApiKey: String? = args.exaKey
+    ?? getenv("EXA_API_KEY").map({ String(cString: $0) })
+
+let model = args.model ?? getenv("MODEL").map({ String(cString: $0) }) ?? defaultModel
+let client = OpenRouterClient(apiKey: apiKey, model: model)
 let tools = allTools
 
 // MARK: - Agent Loop

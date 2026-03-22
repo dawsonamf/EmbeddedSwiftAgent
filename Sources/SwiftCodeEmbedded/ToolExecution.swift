@@ -1,90 +1,6 @@
 import Cstdio
 
-// MARK: - Tool Definitions
-
-let shellTool = ToolDefinition(
-    name: "sh",
-    description: "Execute a shell command and return its output",
-    parametersJSON: """
-    {"type":"object","properties":{"c":{"type":"string","description":"The shell command to execute"}},"required":["c"]}
-    """
-)
-
-let subagentTool = ToolDefinition(
-    name: "subagent",
-    description: "Spawn a subagent to handle a self-contained task. The subagent gets its own conversation context, can use all the same tools (including spawning further subagents), and runs to completion. Returns the subagent's final text response.",
-    parametersJSON: """
-    {"type":"object","properties":{"task":{"type":"string","description":"The task/prompt for the subagent"},"model":{"type":"string","description":"Optional model override (e.g. 'anthropic/claude-sonnet-4'). Defaults to the parent agent's model."}},"required":["task"]}
-    """
-)
-
-let readFileTool = ToolDefinition(
-    name: "read_file",
-    description: "Read the contents of a file, optionally limited to a range of lines. Returns content with 1-indexed line numbers prefixed.",
-    parametersJSON: """
-    {"type":"object","properties":{"path":{"type":"string","description":"Absolute or relative path to the file"},"offset":{"type":"integer","description":"1-indexed line number to start reading from (optional)"},"limit":{"type":"integer","description":"Maximum number of lines to return (optional)"}},"required":["path"]}
-    """
-)
-
-let writeFileTool = ToolDefinition(
-    name: "write_file",
-    description: "Create or overwrite a file with the given content. Creates intermediate directories as needed.",
-    parametersJSON: """
-    {"type":"object","properties":{"path":{"type":"string","description":"Absolute or relative path to the file"},"content":{"type":"string","description":"Content to write to the file"}},"required":["path","content"]}
-    """
-)
-
-let strReplaceTool = ToolDefinition(
-    name: "str_replace",
-    description: "Replace an exact unique string in a file. Fails if old_str is not found or matches more than once.",
-    parametersJSON: """
-    {"type":"object","properties":{"path":{"type":"string","description":"Absolute or relative path to the file"},"old_str":{"type":"string","description":"Exact string to find (must match exactly once)"},"new_str":{"type":"string","description":"String to replace it with"}},"required":["path","old_str","new_str"]}
-    """
-)
-
-let globTool = ToolDefinition(
-    name: "glob",
-    description: "Find files matching a glob pattern. Returns up to 200 sorted file paths.",
-    parametersJSON: """
-    {"type":"object","properties":{"pattern":{"type":"string","description":"Glob pattern (e.g. *.swift, *.ts)"},"path":{"type":"string","description":"Directory to search in (defaults to current directory)"}},"required":["pattern"]}
-    """
-)
-
-let grepTool = ToolDefinition(
-    name: "grep",
-    description: "Search for a pattern in files. Returns up to 200 matching lines with file and line number.",
-    parametersJSON: """
-    {"type":"object","properties":{"pattern":{"type":"string","description":"Search pattern"},"path":{"type":"string","description":"Directory or file to search in (defaults to current directory)"},"include":{"type":"string","description":"Glob to filter files (e.g. *.swift)"}},"required":["pattern"]}
-    """
-)
-
-let webSearchTool = ToolDefinition(
-    name: "web_search",
-    description: "Search the web using Exa. Returns titles, URLs, and relevant highlights.",
-    parametersJSON: """
-    {"type":"object","properties":{"query":{"type":"string","description":"Search query"},"num_results":{"type":"integer","description":"Number of results to return (default 5)"}},"required":["query"]}
-    """
-)
-
-let webFetchTool = ToolDefinition(
-    name: "web_fetch",
-    description: "Fetch the text content of a URL using Exa (handles JS-rendered pages, PDFs, returns clean text).",
-    parametersJSON: """
-    {"type":"object","properties":{"url":{"type":"string","description":"URL to fetch"},"max_chars":{"type":"integer","description":"Maximum characters to return (default 20000)"}},"required":["url"]}
-    """
-)
-
-let mcpTool = ToolDefinition(
-    name: "mcp",
-    description: "Execute an MCP (Model Context Protocol) tool on a named server.",
-    parametersJSON: """
-    {"type":"object","properties":{"server":{"type":"string","description":"MCP server name"},"tool":{"type":"string","description":"Tool name on the server"},"args":{"type":"string","description":"JSON-encoded arguments for the tool (optional)"}},"required":["server","tool"]}
-    """
-)
-
-let allTools = [shellTool, subagentTool, readFileTool, writeFileTool, strReplaceTool, globTool, grepTool, webSearchTool, webFetchTool, mcpTool]
-
-// MARK: - Tool Execution
+// MARK: - Tool Dispatch
 
 extension AgentLoop {
 
@@ -187,56 +103,6 @@ extension AgentLoop {
         return ToolResultMessage(toolCallId: toolCall.id, content: output, isError: false)
     }
 
-    func executeToolsInParallel(_ toolCalls: [ToolCall]) -> [ToolResultMessage] {
-        let count = toolCalls.count
-
-        let resultsBox = ParallelResultsBox(count: count)
-
-        for toolCall in toolCalls {
-            onEvent(.toolExecStart(
-                id: toolCall.id,
-                toolName: toolCall.functionName,
-                args: toolCall.arguments
-            ))
-        }
-
-        var threadHandles: [UnsafeMutableRawPointer] = []
-        for i in 0..<count {
-            let ctx = ParallelToolContext(
-                index: i,
-                toolCall: toolCalls[i],
-                agentLoop: self,
-                resultsBox: resultsBox
-            )
-            let ctxPtr = Unmanaged.passRetained(ctx).toOpaque()
-            if let handle = sc_thread_create(parallelToolCallback, ctxPtr) {
-                threadHandles.append(handle)
-            } else {
-                Unmanaged<ParallelToolContext>.fromOpaque(ctxPtr).release()
-                let result = executeTool(toolCalls[i])
-                resultsBox.set(index: i, result: result)
-            }
-        }
-
-        for handle in threadHandles {
-            sc_thread_join(handle)
-        }
-
-        var results: [ToolResultMessage] = []
-        for i in 0..<count {
-            let result = resultsBox.get(index: i)
-            onEvent(.toolExecEnd(
-                id: toolCalls[i].id,
-                toolName: toolCalls[i].functionName,
-                result: result.content,
-                isError: result.isError
-            ))
-            results.append(result)
-        }
-
-        return results
-    }
-
     func appendSyntheticResults(
         from startIndex: Int,
         in toolCalls: [ToolCall],
@@ -332,7 +198,7 @@ func extractMcpArgs(from arguments: String) -> (server: String, tool: String, ar
     return (server, tool, args)
 }
 
-// MARK: - Tool Execution Functions
+// MARK: - Tool Implementation: File Operations
 
 /// Returns the index of the first occurrence of `needle` in `haystack` at or after `from`, or nil.
 private func byteSearch(_ haystack: [UInt8], _ needle: [UInt8], from: Int = 0) -> Int? {
@@ -526,7 +392,43 @@ extension AgentLoop {
         let content = utf8IsEmpty(result.output) ? "(no matches)" : result.output
         return ToolResultMessage(toolCallId: toolCall.id, content: content, isError: false)
     }
+}
 
+// MARK: - Tool Implementation: Web
+
+/// Escapes a string for safe inclusion in a JSON string literal (byte-level, no Unicode tables).
+/// Handles all control characters (0x00-0x1F) per the JSON spec.
+private func jsonEscapeString(_ s: String) -> String {
+    let hexDigits: [UInt8] = [
+        0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, // 0-7
+        0x38, 0x39, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66  // 8-f
+    ]
+    var out: [UInt8] = []
+    for byte in s.utf8 {
+        switch byte {
+        case 0x22: out.append(0x5C); out.append(0x22) // \"
+        case 0x5C: out.append(0x5C); out.append(0x5C) // \\
+        case 0x0A: out.append(0x5C); out.append(0x6E) // \n
+        case 0x0D: out.append(0x5C); out.append(0x72) // \r
+        case 0x09: out.append(0x5C); out.append(0x74) // \t
+        case 0x08: out.append(0x5C); out.append(0x62) // \b
+        case 0x0C: out.append(0x5C); out.append(0x66) // \f
+        case 0x00...0x1F:
+            // \u00XX for remaining control chars
+            out.append(0x5C) // backslash
+            out.append(0x75) // u
+            out.append(0x30) // 0
+            out.append(0x30) // 0
+            out.append(hexDigits[Int(byte >> 4)])
+            out.append(hexDigits[Int(byte & 0x0F)])
+        default: out.append(byte)
+        }
+    }
+    out.append(0)
+    return out.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+}
+
+extension AgentLoop {
     func executeWebSearch(_ toolCall: ToolCall) -> ToolResultMessage {
         let (query, numResults) = extractWebSearchArgs(from: toolCall.arguments)
         guard !utf8IsEmpty(query) else {
@@ -618,126 +520,4 @@ extension AgentLoop {
             isError: true
         )
     }
-}
-
-// MARK: - JSON String Escaping
-
-/// Escapes a string for safe inclusion in a JSON string literal (byte-level, no Unicode tables).
-/// Handles all control characters (0x00-0x1F) per the JSON spec.
-private func jsonEscapeString(_ s: String) -> String {
-    let hexDigits: [UInt8] = [
-        0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, // 0-7
-        0x38, 0x39, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66  // 8-f
-    ]
-    var out: [UInt8] = []
-    for byte in s.utf8 {
-        switch byte {
-        case 0x22: out.append(0x5C); out.append(0x22) // \"
-        case 0x5C: out.append(0x5C); out.append(0x5C) // \\
-        case 0x0A: out.append(0x5C); out.append(0x6E) // \n
-        case 0x0D: out.append(0x5C); out.append(0x72) // \r
-        case 0x09: out.append(0x5C); out.append(0x74) // \t
-        case 0x08: out.append(0x5C); out.append(0x62) // \b
-        case 0x0C: out.append(0x5C); out.append(0x66) // \f
-        case 0x00...0x1F:
-            // \u00XX for remaining control chars
-            out.append(0x5C) // backslash
-            out.append(0x75) // u
-            out.append(0x30) // 0
-            out.append(0x30) // 0
-            out.append(hexDigits[Int(byte >> 4)])
-            out.append(hexDigits[Int(byte & 0x0F)])
-        default: out.append(byte)
-        }
-    }
-    out.append(0)
-    return out.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
-}
-
-// MARK: - Parallel Execution Support
-
-/// Mutable box for capturing a subagent's final response.
-private final class ResponseBox: @unchecked Sendable {
-    private var _value: String?
-    private let mutex: OpaquePointer
-
-    init() {
-        mutex = OpaquePointer(sc_mutex_create())
-    }
-
-    var value: String? {
-        get {
-            sc_mutex_lock(UnsafeMutableRawPointer(mutex))
-            let v = _value
-            sc_mutex_unlock(UnsafeMutableRawPointer(mutex))
-            return v
-        }
-        set {
-            sc_mutex_lock(UnsafeMutableRawPointer(mutex))
-            _value = newValue
-            sc_mutex_unlock(UnsafeMutableRawPointer(mutex))
-        }
-    }
-
-    deinit {
-        sc_mutex_destroy(UnsafeMutableRawPointer(mutex))
-    }
-}
-
-/// Thread-safe storage for parallel tool results. Each slot is written by exactly one thread.
-private final class ParallelResultsBox: @unchecked Sendable {
-    private var results: [ToolResultMessage?]
-    private let mutex: OpaquePointer
-
-    init(count: Int) {
-        results = [ToolResultMessage?](repeating: nil, count: count)
-        mutex = OpaquePointer(sc_mutex_create())
-    }
-
-    func set(index: Int, result: ToolResultMessage) {
-        sc_mutex_lock(UnsafeMutableRawPointer(mutex))
-        results[index] = result
-        sc_mutex_unlock(UnsafeMutableRawPointer(mutex))
-    }
-
-    func get(index: Int) -> ToolResultMessage {
-        sc_mutex_lock(UnsafeMutableRawPointer(mutex))
-        let r = results[index] ?? ToolResultMessage(
-            toolCallId: "",
-            content: "parallel-exec-error: no result captured",
-            isError: true
-        )
-        sc_mutex_unlock(UnsafeMutableRawPointer(mutex))
-        return r
-    }
-
-    deinit {
-        sc_mutex_destroy(UnsafeMutableRawPointer(mutex))
-    }
-}
-
-/// Context passed to each parallel tool execution pthread.
-private final class ParallelToolContext: @unchecked Sendable {
-    let index: Int
-    let toolCall: ToolCall
-    let agentLoop: AgentLoop
-    let resultsBox: ParallelResultsBox
-
-    init(index: Int, toolCall: ToolCall, agentLoop: AgentLoop, resultsBox: ParallelResultsBox) {
-        self.index = index
-        self.toolCall = toolCall
-        self.agentLoop = agentLoop
-        self.resultsBox = resultsBox
-    }
-}
-
-/// The @convention(c) callback invoked on each pthread for parallel tool execution.
-private let parallelToolCallback: @convention(c) (UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? = { rawCtx in
-    guard let rawCtx = rawCtx else { return nil }
-    let ctx = Unmanaged<ParallelToolContext>.fromOpaque(rawCtx).takeRetainedValue()
-
-    let result = ctx.agentLoop.executeTool(ctx.toolCall)
-    ctx.resultsBox.set(index: ctx.index, result: result)
-
-    return nil
 }

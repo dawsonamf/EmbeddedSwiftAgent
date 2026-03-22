@@ -168,7 +168,14 @@ if $MAC_BUILT; then
 
         run_case() {
             local prompt="$1"
-            printf "%s" "$prompt" | OPENROUTER_API_KEY="$OPENROUTER_API_KEY" "$BINARY_PATH" 2>&1 | strip_ansi
+            local flags=(--openrouter-key "$OPENROUTER_API_KEY")
+            if [[ -n "${EXA_API_KEY:-}" ]]; then
+                flags+=(--exa-key "$EXA_API_KEY")
+            fi
+            if [[ -n "${MODEL:-}" ]]; then
+                flags+=(--model "$MODEL")
+            fi
+            printf "%s" "$prompt" | "$BINARY_PATH" "${flags[@]}" 2>&1 | strip_ansi
         }
         export -f run_case
 

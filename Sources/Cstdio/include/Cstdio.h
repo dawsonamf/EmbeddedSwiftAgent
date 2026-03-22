@@ -45,4 +45,7 @@ void sc_atomic_flag_destroy(void *flag_handle);
 
 void sc_install_sigint_handler(void *flag_handle);
 
+int sc_get_argc(void);
+const char *sc_get_argv(int index);
+
 #endif

@@ -2,6 +2,10 @@
 #include <errno.h>
 #include <time.h>
 
+#ifdef __APPLE__
+#include <crt_externs.h>
+#endif
+
 void flush_stdout(void) {
     fflush(stdout);
 }
@@ -203,3 +207,36 @@ void sc_install_sigint_handler(void *flag_handle) {
     g_sc_sigint_flag = (volatile sig_atomic_t *)flag_handle;
     signal(SIGINT, sc_sigint_handler);
 }
+
+#ifdef __APPLE__
+
+int sc_get_argc(void) {
+    return *_NSGetArgc();
+}
+
+const char *sc_get_argv(int index) {
+    return (*_NSGetArgv())[index];
+}
+
+#else
+
+static int g_argc = 0;
+static char **g_argv = NULL;
+
+__attribute__((constructor))
+static void sc_save_args(int argc, char **argv, char **envp) {
+    (void)envp;
+    g_argc = argc;
+    g_argv = argv;
+}
+
+int sc_get_argc(void) {
+    return g_argc;
+}
+
+const char *sc_get_argv(int index) {
+    if (g_argv == NULL || index < 0 || index >= g_argc) return NULL;
+    return g_argv[index];
+}
+
+#endif
