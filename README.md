@@ -97,7 +97,7 @@ Agent tests require `OPENROUTER_API_KEY`. Set `MODEL` to override the default mo
 
 | Target | Stripped Size |
 |---|---|
-| macOS arm64 | 183.6 KB |
-| Linux aarch64 | 195.0 KB |
+| macOS arm64 | 183.7 KB (188176 bytes) |
+| Linux aarch64 | 195.0 KB (199680 bytes) |
 
 Startup time to interactive prompt: **~120ms** (mean of 30 runs, σ=1.9ms, 95% CI ±0.7ms). Measured on Apple Silicon by piping empty input and timing process lifetime.
