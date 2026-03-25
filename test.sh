@@ -7,7 +7,7 @@ RED='\033[0;31m'
 DIM='\033[2m'
 RESET='\033[0m'
 
-BINARY_NAME="SwiftCodeEmbedded"
+BINARY_NAME="EmbeddedSwiftAgent"
 SCRATCH="/tmp/swiftcode-build"
 BINARY_PATH="$SCRATCH/arm64-apple-macosx/release/$BINARY_NAME"
 MAC_LOG=$(mktemp)

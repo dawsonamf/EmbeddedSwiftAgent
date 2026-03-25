@@ -1,4 +1,4 @@
-# SwiftCodeEmbedded — TODO
+# EmbeddedSwiftAgent — TODO
 
 ## 1. Tool argument validation
 
@@ -19,3 +19,7 @@ Auto-load `AGENTS.md` from repo root and global config path into context. Suppor
 ## 5. Skills support
 
 Skill discovery, auto-loading of headers into context, full loading via slash command or agent-initiated. Skills are markdown instruction files — just context management, no special runtime.
+
+## 6. Message-level rollback
+
+Implement the ability to roll back the entire codebase/file environment to the state it was in at a given message. Each message (or tool execution) should snapshot the file-system changes it introduced, allowing the user to revert all changes back to any prior message boundary. This enables undo-style workflows where the user can say "roll back to message N" and have every file restored to its state at that point.

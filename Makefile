@@ -1,6 +1,6 @@
 SWIFT      = swiftly run swift +main-snapshot
 SCRATCH    = /tmp/swiftcode-build
-BINARY     = $(SCRATCH)/arm64-apple-macosx/release/SwiftCodeEmbedded
+BINARY     = $(SCRATCH)/arm64-apple-macosx/release/EmbeddedSwiftAgent
 
 .PHONY: build run rerun test size clean
 

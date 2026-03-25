@@ -12,7 +12,7 @@ let platformLinkerFlags: [LinkerSetting] = [
 #endif
 
 let package = Package(
-    name: "SwiftCodeEmbedded",
+    name: "EmbeddedSwiftAgent",
     platforms: [.macOS(.v14)],
     targets: [
         .systemLibrary(
@@ -35,9 +35,9 @@ let package = Package(
             publicHeadersPath: "include"
         ),
         .executableTarget(
-            name: "SwiftCodeEmbedded",
+            name: "EmbeddedSwiftAgent",
             dependencies: ["Ccurl", "CcJSON", "Cstdio"],
-            path: "Sources/SwiftCodeEmbedded",
+            path: "Sources/EmbeddedSwiftAgent",
             swiftSettings: [
                 .enableExperimentalFeature("Embedded"),
                 .unsafeFlags(["-whole-module-optimization"]),

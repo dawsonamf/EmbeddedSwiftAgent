@@ -1,4 +1,4 @@
-# SwiftCodeEmbedded
+# EmbeddedSwiftAgent
 
 A fully-featured coding agent in under 200 KB — written in Embedded Swift with no Foundation, no runtime, and no dependencies beyond POSIX, cJSON, and libcurl.
 

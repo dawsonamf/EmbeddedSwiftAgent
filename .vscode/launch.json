@@ -4,21 +4,41 @@
       "type": "swift",
       "request": "launch",
       "args": [],
-      "cwd": "${workspaceFolder:SwiftCodeEmbedded}",
-      "name": "Debug SwiftCodeEmbedded",
-      "target": "SwiftCodeEmbedded",
+      "cwd": "${workspaceFolder:EmbeddedSwiftAgent}",
+      "name": "Debug EmbeddedSwiftAgent",
+      "target": "EmbeddedSwiftAgent",
       "configuration": "debug",
-      "preLaunchTask": "swift: Build Debug SwiftCodeEmbedded"
+      "preLaunchTask": "swift: Build Debug EmbeddedSwiftAgent"
     },
     {
       "type": "swift",
       "request": "launch",
       "args": [],
-      "cwd": "${workspaceFolder:SwiftCodeEmbedded}",
-      "name": "Release SwiftCodeEmbedded",
-      "target": "SwiftCodeEmbedded",
+      "cwd": "${workspaceFolder:EmbeddedSwiftAgent}",
+      "name": "Release EmbeddedSwiftAgent",
+      "target": "EmbeddedSwiftAgent",
       "configuration": "release",
-      "preLaunchTask": "swift: Build Release SwiftCodeEmbedded"
+      "preLaunchTask": "swift: Build Release EmbeddedSwiftAgent"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:EmbeddedSwiftAgent}",
+      "name": "Debug EmbeddedSwiftAgent",
+      "target": "EmbeddedSwiftAgent",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug EmbeddedSwiftAgent"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:EmbeddedSwiftAgent}",
+      "name": "Release EmbeddedSwiftAgent",
+      "target": "EmbeddedSwiftAgent",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release EmbeddedSwiftAgent"
     }
   ]
 }
