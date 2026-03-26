@@ -4,11 +4,13 @@ import Cstdio
 
 struct ParsedArgs {
     var model: String?
+    var reasoningEffort: String?
     var openrouterKey: String?
     var exaKey: String?
 }
 
 let defaultModel = "anthropic/claude-haiku-4.5"
+let defaultReasoningEffort = "high"
 
 /// Parses CLI arguments for `--model`, `--openrouter-key`, and `--exa-key`.
 /// Each flag expects the next argument as its value.
@@ -23,6 +25,11 @@ func parseArgs() -> ParsedArgs {
             i += 1
             if i < argc, let val = sc_get_argv(Int32(i)) {
                 result.model = String(cString: val)
+            }
+        } else if utf8Equal(arg, "--reasoning-effort") {
+            i += 1
+            if i < argc, let val = sc_get_argv(Int32(i)) {
+                result.reasoningEffort = String(cString: val)
             }
         } else if utf8Equal(arg, "--openrouter-key") {
             i += 1

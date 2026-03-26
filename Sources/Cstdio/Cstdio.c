@@ -1,6 +1,7 @@
 #include "include/Cstdio.h"
 #include <errno.h>
 #include <time.h>
+#include <termios.h>
 
 #ifdef __APPLE__
 #include <crt_externs.h>
@@ -206,6 +207,38 @@ static void sc_sigint_handler(int signo) {
 void sc_install_sigint_handler(void *flag_handle) {
     g_sc_sigint_flag = (volatile sig_atomic_t *)flag_handle;
     signal(SIGINT, sc_sigint_handler);
+}
+
+// MARK: - Raw terminal mode
+
+static struct termios g_orig_termios;
+static int g_raw_mode_enabled = 0;
+
+void sc_enable_raw_mode(void) {
+    if (g_raw_mode_enabled) return;
+    if (tcgetattr(STDIN_FILENO, &g_orig_termios) != 0) return;
+
+    struct termios raw = g_orig_termios;
+    raw.c_lflag &= ~(ICANON | ECHO | ISIG);
+    raw.c_cc[VMIN] = 1;
+    raw.c_cc[VTIME] = 0;
+
+    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == 0) {
+        g_raw_mode_enabled = 1;
+    }
+}
+
+void sc_disable_raw_mode(void) {
+    if (!g_raw_mode_enabled) return;
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &g_orig_termios);
+    g_raw_mode_enabled = 0;
+}
+
+int sc_read_byte_stdin(void) {
+    unsigned char c;
+    ssize_t n = read(STDIN_FILENO, &c, 1);
+    if (n <= 0) return -1;
+    return (int)c;
 }
 
 #ifdef __APPLE__

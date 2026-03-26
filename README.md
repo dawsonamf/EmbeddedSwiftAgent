@@ -1,12 +1,12 @@
 # EmbeddedSwiftAgent
 
-A fully-featured coding agent in under 200 KB — written in Embedded Swift with no Foundation, no runtime, and no dependencies beyond POSIX, cJSON, and libcurl.
+A fully-featured coding agent in 200 KB — written in Embedded Swift with no Foundation, no runtime, and no dependencies beyond POSIX, cJSON, and libcurl.
 
 **This agent was built with itself.** Once the core loop was functional (a plain Swift prototype with a shell command execution tool), I used the agent to port itself to Embedded Swift, strip out Foundation, and build every subsequent feature: file operations, parallel tool execution, subagents, streaming, web search, and more. Most of the code you see here was written with the agent running inside its own binary.
 
 ## What It Does
 
-An interactive REPL that takes natural-language prompts, sends them to an LLM via OpenRouter, and autonomously executes tool calls in a loop until the task is done. The agent can run shell commands, read/write/edit files, search the web, spawn subagents, and more. All from a ~184 KB binary with zero Swift runtime overhead.
+An interactive REPL that takes natural-language prompts, sends them to an LLM via OpenRouter, and autonomously executes tool calls in a loop until the task is done. The agent can run shell commands, read/write/edit files, search the web, spawn subagents, and more. All from a ~200 KB binary with zero Swift runtime overhead.
 
 Key features:
 
@@ -45,6 +45,7 @@ All configuration is via CLI flags or environment variables. Flags take preceden
 | `--openrouter-key` | `OPENROUTER_API_KEY` | *(required)*                 | OpenRouter API key                         |
 | `--exa-key`        | `EXA_API_KEY`        | *(none)*                     | Exa API key for `web_search` / `web_fetch` |
 | `--model`          | `MODEL`              | `anthropic/claude-haiku-4.5` | Model to use via OpenRouter                |
+| `--reasoning-effort` | `REASONING_EFFORT` | `high`                       | Reasoning effort (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`) |
 
 
 ## Requirements
@@ -68,6 +69,9 @@ make run ARGS="--openrouter-key your-key --exa-key your-key"
 
 # override model
 make run ARGS="--model openai/gpt-4o"
+
+# override reasoning effort
+make run ARGS="--reasoning-effort medium"
 
 # combine as needed
 make run ARGS="--openrouter-key your-key --model openai/gpt-5.4-nano"
@@ -105,8 +109,8 @@ Agent tests require `OPENROUTER_API_KEY`. Set `MODEL` to override the default mo
 
 | Target        | Stripped Size           |
 | ------------- | ----------------------- |
-| macOS arm64   | 183.7 KB (188176 bytes) |
-| Linux aarch64 | 195.0 KB (199680 bytes) |
+| macOS arm64   | 201.8 KB (206736 bytes) |
+| Linux aarch64 | 195.0 KB (199688 bytes) |
 
 
 Startup time to interactive prompt: **~120ms** (mean of 30 runs, σ=1.9ms, 95% CI ±0.7ms). Measured on Apple Silicon (M4 Pro) by piping empty input and timing process lifetime.

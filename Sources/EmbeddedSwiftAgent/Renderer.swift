@@ -10,13 +10,10 @@ let ansiBlue       = "\u{001B}[34m"
 let ansiDimBlue    = "\u{001B}[2;34m"
 let ansiMagenta    = "\u{001B}[35m"
 let ansiDimMagenta = "\u{001B}[2;35m"
-
-nonisolated(unsafe) var quietSubagents = true
+let ansiYellow     = "\u{001B}[33m"
 
 // MARK: - Event Rendering
 
-/// Shared rendering logic. `prefix` is empty for top-level events,
-/// or a gutter string (e.g. "│ ") for nested subagent output.
 func renderEventCore(_ event: AgentEvent, prefix: String) {
     switch event {
     case .messageUpdate(_, let streamEvent):
@@ -40,38 +37,53 @@ func renderEventCore(_ event: AgentEvent, prefix: String) {
         }
 
     case .toolExecStart(_, let toolName, let args):
+        let json = jsonParse(args)
         if utf8Equal(toolName, "sh") {
-            let command = extractShellCommand(from: args)
+            let command = json?["c"]?.string ?? args
             print("\(prefix)\(ansiBlue)[running: \(command)]\(ansiReset)")
         } else if utf8Equal(toolName, "read_file") {
-            let (path, _, _) = extractReadFileArgs(from: args)
+            let path = json?["path"]?.string ?? ""
             print("\(prefix)\(ansiBlue)[reading: \(path)]\(ansiReset)")
         } else if utf8Equal(toolName, "write_file") {
-            let (path, _) = extractWriteFileArgs(from: args)
+            let path = json?["path"]?.string ?? ""
             print("\(prefix)\(ansiBlue)[writing: \(path)]\(ansiReset)")
         } else if utf8Equal(toolName, "str_replace") {
-            let (path, _, _) = extractStrReplaceArgs(from: args)
+            let path = json?["path"]?.string ?? ""
             print("\(prefix)\(ansiBlue)[editing: \(path)]\(ansiReset)")
         } else if utf8Equal(toolName, "glob") {
-            let (pattern, _) = extractGlobArgs(from: args)
+            let pattern = json?["pattern"]?.string ?? ""
             print("\(prefix)\(ansiBlue)[glob: \(pattern)]\(ansiReset)")
         } else if utf8Equal(toolName, "grep") {
-            let (pattern, _, _) = extractGrepArgs(from: args)
+            let pattern = json?["pattern"]?.string ?? ""
             print("\(prefix)\(ansiBlue)[grep: \(pattern)]\(ansiReset)")
         } else if utf8Equal(toolName, "web_search") {
-            let (query, _) = extractWebSearchArgs(from: args)
+            let query = json?["query"]?.string ?? ""
             let preview = utf8Truncate(query, maxBytes: 60)
             print("\(prefix)\(ansiBlue)[searching: \(preview)]\(ansiReset)")
         } else if utf8Equal(toolName, "web_fetch") {
-            let (url, _) = extractWebFetchArgs(from: args)
+            let url = json?["url"]?.string ?? ""
             print("\(prefix)\(ansiBlue)[fetching: \(url)]\(ansiReset)")
         } else if utf8Equal(toolName, "mcp") {
-            let (server, tool, _) = extractMcpArgs(from: args)
+            let server = json?["server"]?.string ?? ""
+            let tool = json?["tool"]?.string ?? ""
             print("\(prefix)\(ansiBlue)[mcp: \(server)/\(tool)]\(ansiReset)")
+        } else if utf8Equal(toolName, "subagent") {
+            let task = json?["task"]?.string ?? ""
+            let preview = utf8Truncate(task, maxBytes: 80)
+            print("\(prefix)\(ansiMagenta)┌─ subagent: \(preview)\(ansiReset)")
+        }
+
+    case .toolExecUpdate(_, let toolName, let partialResult):
+        if utf8Equal(toolName, "subagent") {
+            print(partialResult, terminator: "")
+            flushStdout()
         }
 
     case .toolExecEnd(_, let toolName, let result, let isError):
-        if utf8Equal(toolName, "subagent") { break }
+        if utf8Equal(toolName, "subagent") {
+            print("\(prefix)\(ansiMagenta)└─ subagent done\(ansiReset)")
+            break
+        }
         if isError {
             print("\(prefix)\(ansiRed)\(result)\(ansiReset)", terminator: utf8HasSuffix(result, "\n") ? "" : "\n")
         } else {
@@ -81,18 +93,12 @@ func renderEventCore(_ event: AgentEvent, prefix: String) {
     case .toolCallSkipped(_, let toolName, let reason):
         print("\(prefix)\(ansiDimBlue)[skipped \(toolName): \(reason)]\(ansiReset)")
 
-    case .subagentStart(let task):
-        let preview = utf8Truncate(task, maxBytes: 80)
-        print("\(prefix)\(ansiMagenta)┌─ subagent: \(preview)\(ansiReset)")
+    case .steeringReceived:
+        print("\(prefix)\(ansiYellow)[steering received]\(ansiReset)")
 
-    case .subagentEnd:
-        print("\(prefix)\(ansiMagenta)└─ subagent done\(ansiReset)")
-
-    case .subagentEvent(let innerEvent):
-        if !quietSubagents {
-            let subPrefix = "\(prefix)\(ansiDimMagenta)│\(ansiReset) "
-            renderEventCore(innerEvent, prefix: subPrefix)
-        }
+    case .followUpConsumed(let text):
+        let preview = utf8Truncate(text, maxBytes: 60)
+        print("\(prefix)\(ansiYellow)[follow-up: \(preview)]\(ansiReset)")
 
     case .aborted:
         print("\(prefix)\n\(ansiRed)[aborted]\(ansiReset)")
@@ -102,7 +108,7 @@ func renderEventCore(_ event: AgentEvent, prefix: String) {
     }
 }
 
-/// Top-level event renderer passed to AgentLoop as the onEvent callback.
+/// Top-level event renderer passed to AgentLoop as the emitEvent callback.
 func renderEvent(_ event: AgentEvent) {
     renderEventCore(event, prefix: "")
 }

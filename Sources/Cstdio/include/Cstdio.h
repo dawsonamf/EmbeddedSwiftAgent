@@ -9,6 +9,7 @@
 #include <spawn.h>
 #include <sys/wait.h>
 #include <pthread.h>
+#include <termios.h>
 
 char **get_environ(void);
 
@@ -47,5 +48,15 @@ void sc_install_sigint_handler(void *flag_handle);
 
 int sc_get_argc(void);
 const char *sc_get_argv(int index);
+
+/// Switches stdin to raw mode (no echo, no canonical buffering).
+/// Saves the original termios so sc_disable_raw_mode() can restore it.
+void sc_enable_raw_mode(void);
+
+/// Restores the original termios saved by sc_enable_raw_mode().
+void sc_disable_raw_mode(void);
+
+/// Reads a single byte from stdin. Returns the byte (0–255) or -1 on EOF/error.
+int sc_read_byte_stdin(void);
 
 #endif

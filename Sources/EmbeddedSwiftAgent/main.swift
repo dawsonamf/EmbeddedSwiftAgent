@@ -15,224 +15,103 @@ let exaApiKey: String? = args.exaKey
     ?? getenv("EXA_API_KEY").map({ String(cString: $0) })
 
 let model = args.model ?? getenv("MODEL").map({ String(cString: $0) }) ?? defaultModel
-let client = OpenRouterClient(apiKey: apiKey, model: model)
+let reasoningEffort = args.reasoningEffort ?? getenv("REASONING_EFFORT").map({ String(cString: $0) }) ?? defaultReasoningEffort
+let client = OpenRouterClient(apiKey: apiKey, model: model, reasoningEffort: reasoningEffort)
 let tools = allTools
 
 // MARK: - Agent Loop
 //
 // The core algorithm: send messages to the LLM, execute any tool calls it
 // requests, append results, and loop until the model stops calling tools.
-// Subagents and follow-up messages can extend the loop across multiple turns.
+//
+// NOTE: Steering (Ctrl+S) and follow-up (Enter while running) support is
+// implemented in InputReader but not wired into the agent loop yet.
+// See InputReader.swift for the raw-mode input handling and queue plumbing.
 
 struct AgentLoop: Sendable {
     let client: OpenRouterClient
-    let apiKey: String
     let exaApiKey: String?
-    let tools: [ToolDefinition]
+    let tools: [Tool]
     let abortFlag: AbortFlag
-    let onEvent: @Sendable (AgentEvent) -> Void
+    let emitEvent: @Sendable (AgentEvent) -> Void
 
-    /// Outer loop: runs turns until the model is done, then checks for follow-ups.
-    func run(
-        messages: inout [ChatMessage],
-        steeringQueue: ThreadSafeQueue,
-        followUpQueue: ThreadSafeQueue
-    ) {
-        onEvent(.agentStart)
+    /// Runs a single agent turn: streams LLM responses, executes tool calls, and
+    /// loops until the model stops calling tools or the user aborts.
+    func run(messages: inout [ChatMessage]) {
+        emitEvent(.agentStart)
 
-        outer: while true {
-            if abortFlag.isSet() {
-                onEvent(.aborted)
-                onEvent(.agentEnd(messages: messages))
-                return
+        while true {
+            if abortFlag.isSet() { emitEvent(.aborted); break }
+
+            // Stream LLM response
+            let toolDefinitions = tools.map { $0.definition }
+            let streamResult = client.sendStreaming(
+                messages: messages,
+                tools: toolDefinitions,
+                abortFlag: abortFlag
+            ) { streamEvent in
+                emitEvent(.messageUpdate(message: ChatMessage(role: ChatRole.assistant), streamEvent: streamEvent))
             }
+            if streamResult.isError { break }
 
-            // Run turns until the model stops requesting tools
-            while true {
-                let result = runTurn(context: &messages, steeringQueue: steeringQueue)
-                switch result {
-                case .done:     break   // model finished, check for follow-ups
-                case .continue: continue // model wants another turn
-                case .exit:
-                    if abortFlag.isSet() { onEvent(.aborted) }
-                    onEvent(.agentEnd(messages: messages))
-                    return
-                }
+            // Append assistant message
+            let assistantMessage = streamResult.toAssistantMessage()
+            emitEvent(.messageEnd(message: assistantMessage))
+            messages.append(assistantMessage)
+
+            // No tool calls — model is done
+            guard !streamResult.toolCalls.isEmpty else { break }
+
+            // Abort check before running tools
+            if abortFlag.isSet() {
+                appendSyntheticResults(from: 0, in: streamResult.toolCalls, content: "Aborted by user", to: &messages)
                 break
             }
 
-            // If there's a queued follow-up, inject it and loop again
-            if let text = followUpQueue.popFirst() {
-                messages.append(ChatMessage(role: ChatRole.user, content: text))
-                continue outer
+            // Execute tool calls
+            let toolResults = executeToolsInParallel(streamResult.toolCalls)
+
+            for result in toolResults {
+                messages.append(result.toChatMessage())
             }
 
-            break
+            emitEvent(.turnEnd(message: assistantMessage, toolResults: toolResults))
         }
 
-        onEvent(.agentEnd(messages: messages))
+        emitEvent(.agentEnd(messages: messages))
     }
 
-    /// One turn = stream an LLM response + execute any tool calls it requests.
-    private func runTurn(
-        context: inout [ChatMessage],
-        steeringQueue: ThreadSafeQueue
-    ) -> TurnResult {
-        onEvent(.turnStart)
-        if abortFlag.isSet() { return .exit }
+    /// Starts the interactive REPL: installs signal handlers, reads input, and
+    /// dispatches each user message through `run()`.
+    func start() {
+        sc_install_sigint_handler(abortFlag.rawPointer)
 
-        // Stream the LLM response, building the assistant message as chunks arrive
-        var assistantMessage = ChatMessage(role: ChatRole.assistant, content: nil)
-        onEvent(.messageStart(message: assistantMessage))
+        let inputReader = InputReader(abortFlag: abortFlag)
+        inputReader.start()
 
-        let streamResult = client.sendStreaming(
-            messages: context,
-            tools: tools,
-            abortFlag: abortFlag
-        ) { streamEvent in
-            switch streamEvent {
-            case .textEnd(let fullText):
-                assistantMessage.content = fullText
-            case .toolCallEnd(let id, let toolName, let fullArgs):
-                let tc = ToolCall(id: id, functionName: toolName, arguments: fullArgs)
-                if assistantMessage.toolCalls == nil {
-                    assistantMessage.toolCalls = [tc]
-                } else {
-                    assistantMessage.toolCalls!.append(tc)
-                }
-            default:
-                break
-            }
-            onEvent(.messageUpdate(message: assistantMessage, streamEvent: streamEvent))
+        var messages: [ChatMessage] = []
+
+        showPrompt()
+
+        while let input = inputReader.waitForInput() {
+            messages.append(ChatMessage(role: ChatRole.user, content: input))
+
+            run(messages: &messages)
+
+            abortFlag.reset()
+            showPrompt()
         }
-
-        // Finalize the assistant message
-        if assistantMessage.content == nil && streamResult.contentText != nil {
-            assistantMessage.content = streamResult.contentText
-        }
-        if assistantMessage.toolCalls == nil && !streamResult.toolCalls.isEmpty {
-            assistantMessage.toolCalls = streamResult.toolCalls
-        }
-
-        onEvent(.messageEnd(message: assistantMessage))
-        context.append(assistantMessage)
-
-        if streamResult.isError {
-            onEvent(.turnEnd(message: assistantMessage, toolResults: []))
-            return .exit
-        }
-
-        // Execute tool calls
-        let toolCalls = streamResult.toolCalls
-        var toolResults: [ToolResultMessage] = []
-
-        // Abort check before running tools
-        if !toolCalls.isEmpty && abortFlag.isSet() {
-            appendSyntheticResults(from: 0, in: toolCalls, content: "Aborted by user",
-                                   to: &toolResults, context: &context)
-            onEvent(.turnEnd(message: assistantMessage, toolResults: toolResults))
-            return .exit
-        }
-
-        // Steering: if the user typed something while tools were queued, skip them
-        if !toolCalls.isEmpty, let steeringText = steeringQueue.popFirst() {
-            let steering = ChatMessage(role: ChatRole.user, content: steeringText)
-            onEvent(.steeringReceived)
-            for skipped in toolCalls {
-                onEvent(.toolCallSkipped(id: skipped.id, toolName: skipped.functionName,
-                                         reason: "user message queued"))
-            }
-            appendSyntheticResults(from: 0, in: toolCalls, content: "Skipped: user message queued",
-                                   to: &toolResults, context: &context)
-            context.append(steering)
-            onEvent(.turnEnd(message: assistantMessage, toolResults: toolResults))
-            return .continue
-        }
-
-        // Single tool call — run directly
-        if toolCalls.count == 1 {
-            let toolCall = toolCalls[0]
-            onEvent(.toolExecStart(id: toolCall.id, toolName: toolCall.functionName, args: toolCall.arguments))
-            let result = executeTool(toolCall)
-            onEvent(.toolExecEnd(id: toolCall.id, toolName: toolCall.functionName,
-                                 result: result.content, isError: result.isError))
-            toolResults.append(result)
-            context.append(result.toChatMessage())
-        }
-        // Multiple tool calls — run in parallel via pthreads
-        else if toolCalls.count > 1 {
-            toolResults = executeToolsInParallel(toolCalls)
-            for result in toolResults {
-                context.append(result.toChatMessage())
-            }
-        }
-
-        onEvent(.turnEnd(message: assistantMessage, toolResults: toolResults))
-        return toolCalls.isEmpty ? .done : .continue
     }
 }
 
 // MARK: - REPL
 
-nonisolated(unsafe) var messages: [ChatMessage] = []
-
 let abortFlag = AbortFlag()
-let steeringQueue = ThreadSafeQueue()
-let followUpQueue = ThreadSafeQueue()
-let directInputQueue = ThreadSafeQueue()
 
-sc_install_sigint_handler(abortFlag.rawPointer)
-
-let inputReader = InputReader(
-    steeringQueue: steeringQueue,
-    directInputQueue: directInputQueue,
-    abortFlag: abortFlag
-)
-
-let agentLoop = AgentLoop(
+AgentLoop(
     client: client,
-    apiKey: apiKey,
     exaApiKey: exaApiKey,
     tools: tools,
     abortFlag: abortFlag,
-    onEvent: renderEvent
-)
-
-inputReader.start()
-showPrompt()
-
-while true {
-    var input: String? = nil
-    while input == nil {
-        if abortFlag.isSet() { break }
-        input = directInputQueue.waitAndPop(timeoutMs: 100)
-        if input == nil && inputReader.eofFlag.isSet() {
-            input = directInputQueue.popFirst()
-            break
-        }
-    }
-
-    if abortFlag.isSet() {
-        print("")
-        break
-    }
-
-    guard let input else {
-        print("")
-        break
-    }
-
-    messages.append(ChatMessage(role: ChatRole.user, content: input))
-    inputReader.setAgentRunning(true)
-
-    agentLoop.run(
-        messages: &messages,
-        steeringQueue: steeringQueue,
-        followUpQueue: followUpQueue
-    )
-
-    abortFlag.reset()
-    inputReader.setAgentRunning(false)
-
-    showPrompt()
-}
+    emitEvent: renderEvent
+).start()

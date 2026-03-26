@@ -1,3 +1,35 @@
+// MARK: - Comparison with pi-agent-core (badlogic/pi-mono)
+//
+// Core lifecycle events (1:1 match):
+//   agent_start / agent_end          → agentStart / agentEnd              ✓
+//   turn_start / turn_end            → turnStart / turnEnd                ✓
+//   message_start / message_update / message_end
+//                                    → messageStart / messageUpdate / messageEnd  ✓
+//   tool_execution_start             → toolExecStart                      ✓
+//   tool_execution_update            → toolExecUpdate                     ✓
+//   tool_execution_end               → toolExecEnd                        ✓
+//
+// Events we have that pi-agent-core does NOT:
+//   steeringReceived      — they handle steering via getSteeringMessages() callback,
+//                            no dedicated event. We emit it for TUI rendering.
+//   toolCallSkipped       — they use beforeToolCall hook returning { block: true },
+//                            then emit tool_execution_end with isError: true instead
+//                            of a separate skip event. We keep it to distinguish
+//                            "intentionally skipped" from "failed".
+//   aborted               — they use AbortSignal + stopReason "aborted" on the
+//                            assistant message, not a separate event. We keep it
+//                            for immediate TUI feedback.
+//
+// Subagents are modeled as regular tools — their internal agent loop is opaque
+// to the event protocol. Use toolExecUpdate to stream inner progress if needed.
+// The renderer can check toolName to display subagent tools specially.
+//
+// Layer 1 (StreamEvent):
+//   No direct counterpart in pi-agent-core. Their streaming granularity lives in
+//   AssistantMessageEvent from the pi-ai package (LLM layer), passed through via
+//   message_update. Our explicit StreamEvent layer is a clean separation that
+//   pi-agent-core achieves differently.
+
 // MARK: - Stop Reason
 
 enum StopReason {
@@ -36,7 +68,7 @@ enum StreamEvent {
 
 /// Emitted by `AgentLoop` during agent orchestration.
 /// Wraps Layer 1 events and adds tool execution, turn, and agent lifecycle events.
-indirect enum AgentEvent {
+enum AgentEvent {
     // Agent lifecycle (one per user message)
     case agentStart
     case agentEnd(messages: [ChatMessage])
@@ -52,17 +84,24 @@ indirect enum AgentEvent {
 
     // Tool execution (agent actually RUNNING the tool)
     case toolExecStart(id: String, toolName: String, args: String)
+    case toolExecUpdate(id: String, toolName: String, partialResult: String)
     case toolExecEnd(id: String, toolName: String, result: String, isError: Bool)
 
-    // Steering
+    // Steering & follow-up
     case steeringReceived
+    case followUpConsumed(text: String)
     case toolCallSkipped(id: String, toolName: String, reason: String)
-
-    // Subagent
-    case subagentStart(task: String)
-    case subagentEnd
-    case subagentEvent(innerEvent: AgentEvent)
 
     // Abort
     case aborted
+}
+
+// MARK: - Helpers
+
+/// Extracts the StreamEvent from a messageUpdate, returns nil for all other AgentEvents.
+func extractStreamDelta(_ event: AgentEvent) -> StreamEvent? {
+    if case .messageUpdate(_, let streamEvent) = event {
+        return streamEvent
+    }
+    return nil
 }

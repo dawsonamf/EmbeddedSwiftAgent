@@ -52,8 +52,7 @@ struct ToolCall {
 struct ToolDefinition {
     var name: String
     var description: String
-    /// Pre-serialized JSON string for the parameters schema
-    var parametersJSON: String
+    var parameters: JSONValue?
 
     func toJSON() -> JSONValue? {
         .object(
@@ -61,10 +60,35 @@ struct ToolDefinition {
             ("function", .object(
                 ("name", .string(name)),
                 ("description", .string(description)),
-                ("parameters", jsonParse(parametersJSON))
+                ("parameters", parameters?.duplicate())
             ))
         )
     }
+}
+
+// MARK: - Tool
+
+/// Everything needed to execute a tool — passed into each tool's execute closure
+/// so tools stay decoupled from AgentLoop.
+struct ToolContext {
+    var toolCallId: String
+    var client: OpenRouterClient
+    var exaApiKey: String?
+    var tools: [Tool]
+    var abortFlag: AbortFlag
+    var emitEvent: @Sendable (AgentEvent) -> Void
+}
+
+/// A single tool: its API definition + its execution logic.
+/// Uses a closure instead of a protocol to avoid existential types (unsupported in embedded Swift).
+struct Tool: @unchecked Sendable {
+    var definition: ToolDefinition
+
+    /// Executes the tool given raw JSON arguments and a context.
+    /// Returns the content string and whether it's an error.
+    var execute: (String, ToolContext) -> (content: String, isError: Bool)
+
+    var name: String { definition.name }
 }
 
 // MARK: - Tool Result Message
@@ -83,14 +107,6 @@ struct ToolResultMessage {
     }
 }
 
-// MARK: - Turn Result
-
-enum TurnResult {
-    case done
-    case `continue`
-    case exit
-}
-
 // MARK: - Stream Result
 
 struct StreamResult {
@@ -102,5 +118,13 @@ struct StreamResult {
 
     var isError: Bool {
         errorMessage != nil
+    }
+
+    func toAssistantMessage() -> ChatMessage {
+        ChatMessage(
+            role: ChatRole.assistant,
+            content: contentText,
+            toolCalls: toolCalls.isEmpty ? nil : toolCalls
+        )
     }
 }

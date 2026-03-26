@@ -164,7 +164,12 @@ func httpPostStreaming(
 
     curl_slist_free_all(headerList)
 
+    // When the user hits Ctrl+C, the write callback returns 0 to abort curl,
+    // which produces CURLE_WRITE_ERROR. That's not a real error — swallow it.
     if result != CURLE_OK {
+        if let abortFlag = abortFlag, abortFlag.isSet() {
+            return HTTPResult(statusCode: -1, curlError: nil)
+        }
         let errStr = String(cString: curl_easy_strerror_wrapper(result))
         return HTTPResult(statusCode: -1, curlError: errStr)
     }

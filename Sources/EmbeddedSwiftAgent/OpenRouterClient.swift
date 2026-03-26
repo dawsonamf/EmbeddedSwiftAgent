@@ -7,6 +7,7 @@ enum StreamPhase {
 struct OpenRouterClient {
     let apiKey: String
     let model: String
+    let reasoningEffort: String
 
     private let endpoint = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -134,6 +135,18 @@ struct OpenRouterClient {
             resultToolCalls.append(ToolCall(id: id, functionName: acc.functionName, arguments: acc.arguments))
         }
 
+        // User hit Ctrl+C — return whatever we've accumulated so far, no error.
+        if abortFlag?.isSet() == true {
+            onEvent(.done(reason: .stop))
+            return StreamResult(
+                contentText: utf8IsEmpty(contentAccumulator) ? nil : contentAccumulator,
+                thinkingText: utf8IsEmpty(thinkingAccumulator) ? nil : thinkingAccumulator,
+                toolCalls: resultToolCalls,
+                stopReason: .stop,
+                errorMessage: nil
+            )
+        }
+
         if let errorMessage = errorMessage {
             onEvent(.done(reason: .stop))
             return StreamResult(contentText: nil, thinkingText: nil, toolCalls: [], stopReason: .stop, errorMessage: errorMessage)
@@ -176,7 +189,7 @@ struct OpenRouterClient {
         let root = JSONValue.object()
         root?["model"] = .string(model)
         root?["stream"] = .bool(true)
-        root?["reasoning"] = .object(("effort", .string("high")))
+        root?["reasoning"] = .object(("effort", .string(reasoningEffort)))
         root?["messages"] = .array(messages.map { $0.toJSON() })
         if !tools.isEmpty {
             root?["tools"] = .array(tools.map { $0.toJSON() })

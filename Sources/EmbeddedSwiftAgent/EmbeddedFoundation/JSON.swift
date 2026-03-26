@@ -32,6 +32,12 @@ final class JSONValue: @unchecked Sendable {
         owned = false
     }
 
+    /// Deep-copies the entire cJSON tree, returning a new owned JSONValue.
+    func duplicate() -> JSONValue? {
+        guard let ptr = cJSON_Duplicate(pointer, 1) else { return nil }
+        return .owned(ptr)
+    }
+
     deinit {
         if owned { cJSON_Delete(pointer) }
     }

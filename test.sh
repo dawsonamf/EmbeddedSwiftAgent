@@ -14,7 +14,18 @@ MAC_LOG=$(mktemp)
 LINUX_LOG=$(mktemp)
 SMOKE_DIR=$(mktemp -d)
 SMOKE_LOCK="$SMOKE_DIR/.lock"
-trap 'rm -f "$MAC_LOG" "$LINUX_LOG"; rm -rf "$SMOKE_DIR"' EXIT
+SPINNER_PID=""
+
+cleanup() {
+    if [[ -n "$SPINNER_PID" ]]; then
+        kill "$SPINNER_PID" 2>/dev/null || true
+        wait "$SPINNER_PID" 2>/dev/null || true
+        printf "\r\033[K"
+    fi
+    rm -f "$MAC_LOG" "$LINUX_LOG"
+    rm -rf "$SMOKE_DIR"
+}
+trap cleanup EXIT
 
 human_size() {
     local bytes=$1
@@ -44,8 +55,10 @@ start_spinner() {
 }
 
 stop_spinner() {
-    kill $SPINNER_PID 2>/dev/null || true
-    wait $SPINNER_PID 2>/dev/null || true
+    [[ -n "$SPINNER_PID" ]] || return
+    kill "$SPINNER_PID" 2>/dev/null || true
+    wait "$SPINNER_PID" 2>/dev/null || true
+    SPINNER_PID=""
     printf "\r\033[K"
 }
 
@@ -116,7 +129,7 @@ print_result() {
         echo -e "${GREEN}✓${RESET} ${BOLD}$label${RESET}  $(human_size "$bytes") ${DIM}($bytes bytes)${RESET}"
         PASS=$((PASS + 1))
     elif [[ "$first" == "SKIP" ]]; then
-        echo -e "${DIM}–${RESET} ${BOLD}$label${RESET}  ${DIM}Docker not found (skipped)${RESET}"
+        echo -e "${DIM}–${RESET} ${BOLD}$label${RESET}  ${DIM}skipped${RESET}"
         SKIP=$((SKIP + 1))
     else
         echo -e "${RED}✗${RESET} ${BOLD}$label${RESET}"

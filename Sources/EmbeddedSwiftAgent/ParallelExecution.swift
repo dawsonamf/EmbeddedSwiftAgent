@@ -9,7 +9,7 @@ extension AgentLoop {
         let resultsBox = ParallelResultsBox(count: count)
 
         for toolCall in toolCalls {
-            onEvent(.toolExecStart(
+            emitEvent(.toolExecStart(
                 id: toolCall.id,
                 toolName: toolCall.functionName,
                 args: toolCall.arguments
@@ -41,7 +41,7 @@ extension AgentLoop {
         var results: [ToolResultMessage] = []
         for i in 0..<count {
             let result = resultsBox.get(index: i)
-            onEvent(.toolExecEnd(
+            emitEvent(.toolExecEnd(
                 id: toolCalls[i].id,
                 toolName: toolCalls[i].functionName,
                 result: result.content,
@@ -54,35 +54,7 @@ extension AgentLoop {
     }
 }
 
-// MARK: - Thread-Safe Result Boxes
-
-/// Mutable box for capturing a subagent's final response.
-final class ResponseBox: @unchecked Sendable {
-    private var _value: String?
-    private let mutex: OpaquePointer
-
-    init() {
-        mutex = OpaquePointer(sc_mutex_create())
-    }
-
-    var value: String? {
-        get {
-            sc_mutex_lock(UnsafeMutableRawPointer(mutex))
-            let v = _value
-            sc_mutex_unlock(UnsafeMutableRawPointer(mutex))
-            return v
-        }
-        set {
-            sc_mutex_lock(UnsafeMutableRawPointer(mutex))
-            _value = newValue
-            sc_mutex_unlock(UnsafeMutableRawPointer(mutex))
-        }
-    }
-
-    deinit {
-        sc_mutex_destroy(UnsafeMutableRawPointer(mutex))
-    }
-}
+// MARK: - Thread-Safe Result Box
 
 /// Thread-safe storage for parallel tool results. Each slot is written by exactly one thread.
 private final class ParallelResultsBox: @unchecked Sendable {
