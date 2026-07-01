@@ -13,10 +13,6 @@ static inline CURLcode curl_easy_setopt_long(CURL *curl, CURLoption option, long
     return curl_easy_setopt(curl, option, param);
 }
 
-static inline CURLcode curl_easy_setopt_ptr(CURL *curl, CURLoption option, void *param) {
-    return curl_easy_setopt(curl, option, param);
-}
-
 static inline CURLcode curl_easy_setopt_slist(CURL *curl, CURLoption option, struct curl_slist *param) {
     return curl_easy_setopt(curl, option, param);
 }

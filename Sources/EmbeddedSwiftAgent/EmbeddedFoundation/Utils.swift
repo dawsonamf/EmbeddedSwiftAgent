@@ -10,15 +10,6 @@ func writeStderr(_ msg: String) {
     write_stderr(msg)
 }
 
-/// Reads a line from stdin, stripping the trailing newline.
-/// Returns nil on EOF.
-func readLineFromStdin() -> String? {
-    guard let cStr = read_line_stdin() else { return nil }
-    let s = String(cString: cStr)
-    free(cStr)
-    return s
-}
-
 // MARK: - UTF8-Safe String Helpers
 // Embedded Swift's stdlib doesn't include the Unicode normalization / grapheme-breaking
 // tables. All string comparisons must go through the UTF8View to avoid pulling those in.

@@ -9,8 +9,33 @@ let ansiRed        = "\u{001B}[31m"
 let ansiBlue       = "\u{001B}[34m"
 let ansiDimBlue    = "\u{001B}[2;34m"
 let ansiMagenta    = "\u{001B}[35m"
-let ansiDimMagenta = "\u{001B}[2;35m"
 let ansiYellow     = "\u{001B}[33m"
+
+// MARK: - Tool Result Previews
+
+// Display-only limits — the model always receives the full tool output in context.
+let toolResultPreviewMaxLines = 5
+let toolResultPreviewMaxBytes = 500
+
+/// Truncates a tool result for terminal display: at most `toolResultPreviewMaxLines`
+/// lines and `toolResultPreviewMaxBytes` bytes. Returns the preview and how many
+/// bytes were omitted (0 if the full result fit).
+func truncateToolResultForDisplay(_ s: String) -> (text: String, omittedBytes: Int) {
+    let bytes = Array(s.utf8)
+    var end = 0
+    var lines = 0
+    while end < bytes.count && end < toolResultPreviewMaxBytes && lines < toolResultPreviewMaxLines {
+        if bytes[end] == 0x0A { lines += 1 }
+        end += 1
+    }
+    if end >= bytes.count { return (s, 0) }
+    // Back off to a UTF-8 boundary so we never split a multi-byte character
+    while end > 0 && (bytes[end] & 0xC0) == 0x80 { end -= 1 }
+    var slice = Array(bytes[..<end])
+    slice.append(0)
+    let text = slice.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+    return (text, bytes.count - end)
+}
 
 // MARK: - Event Rendering
 
@@ -73,21 +98,21 @@ func renderEventCore(_ event: AgentEvent, prefix: String) {
             print("\(prefix)\(ansiMagenta)┌─ subagent: \(preview)\(ansiReset)")
         }
 
-    case .toolExecUpdate(_, let toolName, let partialResult):
-        if utf8Equal(toolName, "subagent") {
-            print(partialResult, terminator: "")
-            flushStdout()
-        }
+    // toolExecUpdate is deliberately not rendered: it's emitted from tool threads,
+    // so parallel subagents streaming into one terminal interleave into gibberish.
+    // The event still exists for structured consumers (e.g. the planned server API).
 
     case .toolExecEnd(_, let toolName, let result, let isError):
         if utf8Equal(toolName, "subagent") {
             print("\(prefix)\(ansiMagenta)└─ subagent done\(ansiReset)")
             break
         }
-        if isError {
-            print("\(prefix)\(ansiRed)\(result)\(ansiReset)", terminator: utf8HasSuffix(result, "\n") ? "" : "\n")
-        } else {
-            print("\(prefix)\(ansiDimBlue)\(result)\(ansiReset)", terminator: utf8HasSuffix(result, "\n") ? "" : "\n")
+        let (preview, omittedBytes) = truncateToolResultForDisplay(result)
+        if utf8IsEmpty(preview) && omittedBytes == 0 { break }
+        let color = isError ? ansiRed : ansiDimBlue
+        print("\(prefix)\(color)\(preview)\(ansiReset)", terminator: utf8HasSuffix(preview, "\n") ? "" : "\n")
+        if omittedBytes > 0 {
+            print("\(prefix)\(ansiDim)[+\(omittedBytes) bytes truncated]\(ansiReset)")
         }
 
     case .toolCallSkipped(_, let toolName, let reason):

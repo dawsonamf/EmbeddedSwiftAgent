@@ -157,7 +157,9 @@ let subagentTool = Tool(
 
         subLoop.run(messages: &subMessages)
 
-        let output = responseQueue.popFirst() ?? "(subagent produced no text response)"
+        // The queue holds every assistant message the subagent produced;
+        // its final one is the answer to return to the parent.
+        let output = responseQueue.drain().last ?? "(subagent produced no text response)"
         return (output, false)
     }
 )
@@ -223,10 +225,16 @@ let readFileTool = Tool(
                 lineStart = i + 1
             }
         }
-        lines.append(rawBytes[lineStart..<bytesRead])
+        // Only append the final line if the file doesn't end with a newline,
+        // so trailing newlines don't produce a phantom empty line.
+        if lineStart < bytesRead {
+            lines.append(rawBytes[lineStart..<bytesRead])
+        }
 
-        let startIdx = max(0, (offset ?? 1) - 1)
-        let endIdx = limit.map { min(lines.count, startIdx + $0) } ?? lines.count
+        // Clamp to valid bounds — an out-of-range offset or negative limit from
+        // the model must not build an invalid range (which would trap).
+        let startIdx = min(max(0, (offset ?? 1) - 1), lines.count)
+        let endIdx = max(startIdx, limit.map { min(lines.count, startIdx + max(0, $0)) } ?? lines.count)
 
         var numbered = ""
         for i in startIdx..<endIdx {
@@ -235,7 +243,7 @@ let readFileTool = Tool(
             let lineStr = lineBytes.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
             numbered += "\(i + 1)|\(lineStr)\n"
         }
-        return (numbered, false)
+        return (utf8IsEmpty(numbered) ? "(no lines in requested range)" : numbered, false)
     }
 )
 

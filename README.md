@@ -13,8 +13,8 @@ Key features:
 - **Streaming responses** — token-by-token output as the LLM generates
 - **Parallel tool execution** — multiple tool calls run concurrently via pthreads
 - **Subagents** — spawn child agents with their own conversation context
-- **Steering** — type while the agent is running to redirect it between tool calls
 - **Ctrl+C abort** — cleanly cancels the current agent run
+- **Steering (in progress)** — raw-mode input plumbing for redirecting the agent mid-run exists in `InputReader`, but isn't wired into the agent loop yet
 
 ## Tools
 
@@ -32,7 +32,7 @@ The agent has access to the following tools:
 | `web_search`  | Search the web via Exa                                        |
 | `web_fetch`   | Fetch the text content of a URL via Exa                       |
 | `subagent`    | Spawn a subagent to handle a self-contained task              |
-| `mcp`         | Execute an MCP tool on a named server                         |
+| `mcp`         | Execute an MCP tool on a named server *(stub — not yet implemented)* |
 
 
 ## Configuration

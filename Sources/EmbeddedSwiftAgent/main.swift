@@ -43,8 +43,11 @@ struct AgentLoop: Sendable {
         while true {
             if abortFlag.isSet() { emitEvent(.aborted); break }
 
+            emitEvent(.turnStart)
+
             // Stream LLM response
             let toolDefinitions = tools.map { $0.definition }
+            emitEvent(.messageStart(message: ChatMessage(role: ChatRole.assistant)))
             let streamResult = client.sendStreaming(
                 messages: messages,
                 tools: toolDefinitions,
@@ -60,7 +63,10 @@ struct AgentLoop: Sendable {
             messages.append(assistantMessage)
 
             // No tool calls — model is done
-            guard !streamResult.toolCalls.isEmpty else { break }
+            guard !streamResult.toolCalls.isEmpty else {
+                emitEvent(.turnEnd(message: assistantMessage, toolResults: []))
+                break
+            }
 
             // Abort check before running tools
             if abortFlag.isSet() {

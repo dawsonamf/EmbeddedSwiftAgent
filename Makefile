@@ -19,7 +19,9 @@ test:
 	./test.sh
 
 size: build
-	@ls -lh $(BINARY) | awk '{print $$5}'
+	@cp $(BINARY) $(BINARY).stripped && strip $(BINARY).stripped 2>/dev/null; \
+	ls -lh $(BINARY).stripped | awk '{print $$5 " (stripped)"}'; \
+	rm -f $(BINARY).stripped
 
 clean:
 	rm -rf $(SCRATCH)
