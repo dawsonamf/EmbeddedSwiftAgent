@@ -16,6 +16,45 @@ let exaApiKey: String? = args.exaKey
 
 let model = args.model ?? getenv("MODEL").map({ String(cString: $0) }) ?? defaultModel
 let reasoningEffort = args.reasoningEffort ?? getenv("REASONING_EFFORT").map({ String(cString: $0) }) ?? defaultReasoningEffort
+
+/// Reads an entire file as a UTF-8 string, or nil if it can't be opened.
+func readEntireFile(_ path: String) -> String? {
+    guard let fp = path.withCString({ fopen($0, "r") }) else { return nil }
+    defer { fclose(fp) }
+
+    fseek(fp, 0, SEEK_END)
+    let fileSize = ftell(fp)
+    fseek(fp, 0, SEEK_SET)
+    guard fileSize > 0 else { return "" }
+
+    var rawBytes = [UInt8](repeating: 0, count: fileSize)
+    let bytesRead = fread(&rawBytes, 1, fileSize, fp)
+    guard bytesRead > 0 else { return "" }
+
+    var bytes = Array(rawBytes[0..<bytesRead])
+    bytes.append(0)
+    return bytes.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+}
+
+// Optional system prompt: --system-prompt-file wins, then the SYSTEM_PROMPT
+// environment variable (which is how the browser demo passes system-context.md in).
+let systemPrompt: String? = {
+    if let path = args.systemPromptFile {
+        guard let contents = readEntireFile(path) else {
+            writeStderr("Cannot read system prompt file: \(path)\n")
+            exit(1)
+        }
+        return contents
+    }
+    return getenv("SYSTEM_PROMPT").map({ String(cString: $0) })
+}()
+
+// A configured system prompt becomes the first message of every conversation.
+let initialMessages: [ChatMessage] = {
+    guard let systemPrompt, !utf8IsEmpty(systemPrompt) else { return [] }
+    return [ChatMessage(role: ChatRole.system, content: systemPrompt)]
+}()
+
 let client = OpenRouterClient(apiKey: apiKey, model: model, reasoningEffort: reasoningEffort)
 let tools = allTools
 
@@ -95,7 +134,7 @@ struct AgentLoop: Sendable {
         // (agent_input_wait suspends the wasm stack via JSPI until the user
         // submits a line). Ctrl+C arrives through the agent_abort export,
         // polled at HTTP chunk boundaries. No threads, no signals, no termios.
-        var messages: [ChatMessage] = []
+        var messages = initialMessages
 
         showPrompt()
 
@@ -136,7 +175,7 @@ struct AgentLoop: Sendable {
         let inputReader = InputReader(abortFlag: abortFlag)
         inputReader.start()
 
-        var messages: [ChatMessage] = []
+        var messages = initialMessages
 
         showPrompt()
 

@@ -46,6 +46,7 @@ All configuration is via CLI flags or environment variables. Flags take preceden
 | `--exa-key`        | `EXA_API_KEY`        | *(none)*                     | Exa API key for `web_search` / `web_fetch` |
 | `--model`          | `MODEL`              | `anthropic/claude-haiku-4.5` | Model to use via OpenRouter                |
 | `--reasoning-effort` | `REASONING_EFFORT` | `high`                       | Reasoning effort (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`) |
+| `--system-prompt-file` | `SYSTEM_PROMPT`  | *(none)*                     | System prompt: the flag takes a path to a file (e.g. a markdown doc), the env var takes the prompt text itself. Seeds every conversation. In the browser, the host page passes it as a WASI env var. |
 
 
 ## Requirements
@@ -73,6 +74,9 @@ make run ARGS="--model openai/gpt-4o"
 # override reasoning effort
 make run ARGS="--reasoning-effort medium"
 
+# seed every conversation with a system prompt from a markdown file
+make run ARGS="--system-prompt-file context.md"
+
 # combine as needed
 make run ARGS="--openrouter-key your-key --model openai/gpt-5.4-nano"
 ```
@@ -99,7 +103,7 @@ swift sdk install <swift-DEVELOPMENT-SNAPSHOT-...-a_wasm.artifactbundle.tar.gz U
 make wasm    # compiles and copies the module into web/
 ```
 
-Then serve the `web/` directory from any static host (no special headers needed — the build is single-threaded, so no SharedArrayBuffer/COOP/COEP). Locally: `make web` serves `web/` and opens the demo (or run `python3 -m http.server 8765` from `web/` yourself). To ship it on a site, copy `web/index.html`, `web/agent.js`, and `web/EmbeddedSwiftAgent.wasm`.
+This repo ships the module and the host glue, not a demo page. To embed the agent in a site, copy `web/agent.js` and `web/EmbeddedSwiftAgent.wasm` to any static host (no special headers needed — the build is single-threaded, so no SharedArrayBuffer/COOP/COEP), create an xterm.js terminal, and call `bootAgent({ term, wasmUrl, env })` with `OPENROUTER_API_KEY`, `MODEL`, etc. in `env`. To give the agent a system prompt, include `SYSTEM_PROMPT` in `env` — for example, fetch a markdown context file from your site and pass its text through.
 
 ## Test
 
@@ -125,9 +129,9 @@ Agent tests require `OPENROUTER_API_KEY`. Set `MODEL` to override the default mo
 
 | Target        | Size                    |
 | ------------- | ----------------------- |
-| macOS arm64   | 200.7 KB (205560 bytes) |
+| macOS arm64   | 200.8 KB (205688 bytes) |
 | Linux aarch64 | 195.0 KB (199704 bytes) |
-| wasm32-wasip1 | 206.1 KB (211093 bytes) |
+| wasm32-wasip1 | 207.8 KB (212826 bytes) |
 
 _macOS and Linux are stripped release binaries; wasm is the shipped `.wasm` module._
 

@@ -7,13 +7,14 @@ struct ParsedArgs {
     var reasoningEffort: String?
     var openrouterKey: String?
     var exaKey: String?
+    var systemPromptFile: String?
 }
 
 let defaultModel = "anthropic/claude-haiku-4.5"
 let defaultReasoningEffort = "high"
 
-/// Parses CLI arguments for `--model`, `--openrouter-key`, and `--exa-key`.
-/// Each flag expects the next argument as its value.
+/// Parses CLI arguments for `--model`, `--reasoning-effort`, `--openrouter-key`,
+/// `--exa-key`, and `--system-prompt-file`. Each flag expects the next argument as its value.
 func parseArgs() -> ParsedArgs {
     var result = ParsedArgs()
     let argc = Int(sc_get_argc())
@@ -40,6 +41,11 @@ func parseArgs() -> ParsedArgs {
             i += 1
             if i < argc, let val = sc_get_argv(Int32(i)) {
                 result.exaKey = String(cString: val)
+            }
+        } else if utf8Equal(arg, "--system-prompt-file") {
+            i += 1
+            if i < argc, let val = sc_get_argv(Int32(i)) {
+                result.systemPromptFile = String(cString: val)
             }
         }
         i += 1

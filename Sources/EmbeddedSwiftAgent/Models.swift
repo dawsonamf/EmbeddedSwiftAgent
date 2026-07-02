@@ -4,6 +4,7 @@
 /// Not a RawRepresentable enum because embedded Swift lacks the runtime support
 /// for String-backed enums. ChatMessage.role is typed as String for direct JSON serialization.
 enum ChatRole {
+    static let system = "system"
     static let user = "user"
     static let assistant = "assistant"
     static let tool = "tool"
