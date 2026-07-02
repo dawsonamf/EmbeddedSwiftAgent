@@ -1,3 +1,6 @@
+// No processes on WASI — the shell-backed tools are compiled out of the
+// browser build entirely (see the tool registry in Tools.swift).
+#if !os(WASI)
 import Cstdio
 
 struct ShellResult {
@@ -70,3 +73,5 @@ func runShell(_ command: String) -> ShellResult {
     let outputStr = output.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
     return ShellResult(output: outputStr, exitCode: exitCode)
 }
+
+#endif // !os(WASI)

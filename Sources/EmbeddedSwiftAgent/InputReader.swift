@@ -1,3 +1,7 @@
+// The browser build replaces stdin entirely: xterm.js captures keys and the
+// JS host queues submitted lines behind agent_input_wait/agent_input_read
+// (see the WASI branch of AgentLoop.start() in main.swift).
+#if !os(WASI)
 import Cstdio
 
 private let inputReaderThreadCallback: @convention(c) (UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? = { rawCtx in
@@ -226,3 +230,5 @@ private final class InputReaderContext {
         self.eofFlag = eofFlag
     }
 }
+
+#endif // !os(WASI)

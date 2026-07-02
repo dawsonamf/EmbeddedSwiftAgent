@@ -90,6 +90,47 @@ struct AgentLoop: Sendable {
     /// Starts the interactive REPL: installs signal handlers, reads input, and
     /// dispatches each user message through `run()`.
     func start() {
+#if os(WASI)
+        // Browser REPL: input arrives from xterm.js through the JS host bridge
+        // (agent_input_wait suspends the wasm stack via JSPI until the user
+        // submits a line). Ctrl+C arrives through the agent_abort export,
+        // polled at HTTP chunk boundaries. No threads, no signals, no termios.
+        var messages: [ChatMessage] = []
+
+        showPrompt()
+
+        while true {
+            let inputLen = agent_input_wait()
+            if inputLen < 0 { break }
+
+            var input = ""
+            if inputLen > 0 {
+                var buf = [UInt8](repeating: 0, count: Int(inputLen))
+                let copied = buf.withUnsafeMutableBufferPointer { ptr in
+                    agent_input_read(ptr.baseAddress, Int32(ptr.count))
+                }
+                if copied > 0 {
+                    var bytes = Array(buf[0..<Int(copied)])
+                    bytes.append(0)
+                    input = bytes.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+                }
+            }
+
+            let trimmed = trimWhitespace(input)
+            if utf8IsEmpty(trimmed) {
+                showPrompt()
+                continue
+            }
+
+            messages.append(ChatMessage(role: ChatRole.user, content: trimmed))
+
+            run(messages: &messages)
+
+            abortFlag.reset()
+            sc_wasm_abort_clear()
+            showPrompt()
+        }
+#else
         sc_install_sigint_handler(abortFlag.rawPointer)
 
         let inputReader = InputReader(abortFlag: abortFlag)
@@ -107,6 +148,7 @@ struct AgentLoop: Sendable {
             abortFlag.reset()
             showPrompt()
         }
+#endif
     }
 }
 

@@ -1,5 +1,23 @@
+#if !os(WASI)
 import Ccurl
+#endif
 import Cstdio
+
+struct HTTPResult {
+    let statusCode: Int32
+    /// Non-nil when the transport itself failed (network error, DNS failure, etc.)
+    let curlError: String?
+}
+
+struct HTTPResponse {
+    let statusCode: Int32
+    let body: String
+    let curlError: String?
+}
+
+// The wasm build implements httpPost/httpPostStreaming over the browser's
+// fetch instead of libcurl — see HTTPWasm.swift.
+#if !os(WASI)
 
 // MARK: - Streaming HTTP POST
 
@@ -47,18 +65,6 @@ private let curlWriteCallback: curl_write_callback = { (ptr: UnsafeMutablePointe
     }
 
     return totalBytes
-}
-
-struct HTTPResult {
-    let statusCode: Int32
-    /// Non-nil when curl itself failed (network error, DNS failure, etc.)
-    let curlError: String?
-}
-
-struct HTTPResponse {
-    let statusCode: Int32
-    let body: String
-    let curlError: String?
 }
 
 /// Accumulates all incoming bytes into a flat buffer for non-streaming HTTP POST.
@@ -178,3 +184,5 @@ func httpPostStreaming(
     curl_easy_getinfo_long(curl, CURLINFO_RESPONSE_CODE, &statusCode)
     return HTTPResult(statusCode: Int32(statusCode), curlError: nil)
 }
+
+#endif // !os(WASI)

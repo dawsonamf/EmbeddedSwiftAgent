@@ -10,8 +10,11 @@ RESET='\033[0m'
 BINARY_NAME="EmbeddedSwiftAgent"
 SCRATCH="/tmp/swiftcode-build"
 BINARY_PATH="$SCRATCH/arm64-apple-macosx/release/$BINARY_NAME"
+WASM_SCRATCH="/tmp/swiftcode-build-wasm"
+WASM_BINARY="$WASM_SCRATCH/wasm32-unknown-wasip1/release/$BINARY_NAME.wasm"
 MAC_LOG=$(mktemp)
 LINUX_LOG=$(mktemp)
+WASM_LOG=$(mktemp)
 SMOKE_DIR=$(mktemp -d)
 SMOKE_LOCK="$SMOKE_DIR/.lock"
 SPINNER_PID=""
@@ -22,7 +25,7 @@ cleanup() {
         wait "$SPINNER_PID" 2>/dev/null || true
         printf "\r\033[K"
     fi
-    rm -f "$MAC_LOG" "$LINUX_LOG"
+    rm -f "$MAC_LOG" "$LINUX_LOG" "$WASM_LOG"
     rm -rf "$SMOKE_DIR"
 }
 trap cleanup EXIT
@@ -104,13 +107,33 @@ build_linux() {
     fi
 }
 
-# ── Run both in parallel with spinner ─────────────────────────
+build_wasm() {
+    # The SDK id lives in the Makefile (single source of truth); skip if the
+    # SDK isn't installed on this machine.
+    local sdk
+    sdk=$(awk -F'=' '/^WASM_SDK[[:space:]]*=/ {gsub(/[[:space:]]/, "", $2); print $2; exit}' Makefile)
+    if [[ -z "$sdk" ]] || ! swiftly run swift sdk list +main-snapshot 2>/dev/null | grep -qx "$sdk"; then
+        echo "SKIP"
+        return
+    fi
+    if BUILD_OUTPUT=$(swiftly run swift build -c release +main-snapshot --swift-sdk "$sdk" --scratch-path "$WASM_SCRATCH" --disable-sandbox 2>&1); then
+        local size
+        size=$(wc -c < "$WASM_BINARY" | tr -d ' ')
+        echo "PASS:$size"
+    else
+        echo "FAIL"
+        echo "$BUILD_OUTPUT"
+    fi
+}
+
+# ── Run all three in parallel with spinner ────────────────────
 
 build_mac   > "$MAC_LOG"   2>&1 &
 build_linux > "$LINUX_LOG" 2>&1 &
+build_wasm  > "$WASM_LOG"  2>&1 &
 
 start_spinner "Building..."
-wait %1 %2 2>/dev/null || true
+wait %1 %2 %3 2>/dev/null || true
 stop_spinner
 
 # ── Results ───────────────────────────────────────────────────
@@ -140,6 +163,7 @@ print_result() {
 
 print_result "macOS" "$MAC_LOG"
 print_result "Linux" "$LINUX_LOG"
+print_result "wasm" "$WASM_LOG"
 
 # ── Smoke Tests (require macOS build + API key) ──────────────
 
@@ -297,10 +321,43 @@ else
     SKIP=$((SKIP + 4))
 fi
 
+# ── Wasm smoke tests (require wasm build + node with JSPI) ───
+# Headless run of the real .wasm through the real web/agent.js glue with
+# canned SSE responses — no API key needed. See web/test/wasm-smoke.mjs.
+
+WASM_BUILT=false
+[[ "$(head -1 "$WASM_LOG")" == PASS:* ]] && WASM_BUILT=true
+
+if ! $WASM_BUILT; then
+    echo -e "${DIM}–${RESET} ${BOLD}wasm smoke${RESET}  ${DIM}wasm build skipped or failed${RESET}"
+    SKIP=$((SKIP + 1))
+elif ! command -v node &>/dev/null; then
+    echo -e "${DIM}–${RESET} ${BOLD}wasm smoke${RESET}  ${DIM}node not found (skipped)${RESET}"
+    SKIP=$((SKIP + 1))
+else
+    start_spinner "Running wasm smoke tests..."
+    WASM_SMOKE_OUT=$(node web/test/wasm-smoke.mjs "$WASM_BINARY" 2>&1)
+    WASM_SMOKE_RC=$?
+    stop_spinner
+
+    if [[ $WASM_SMOKE_RC -eq 0 ]]; then
+        CHECKS=$(printf "%s\n" "$WASM_SMOKE_OUT" | grep -c '^PASS:')
+        echo -e "${GREEN}✓${RESET} ${BOLD}wasm smoke${RESET}  ${DIM}($CHECKS checks)${RESET}"
+        PASS=$((PASS + 1))
+    elif [[ $WASM_SMOKE_RC -eq 3 ]]; then
+        echo -e "${DIM}–${RESET} ${BOLD}wasm smoke${RESET}  ${DIM}$(printf "%s" "$WASM_SMOKE_OUT" | head -1)${RESET}"
+        SKIP=$((SKIP + 1))
+    else
+        echo -e "${RED}✗${RESET} ${BOLD}wasm smoke${RESET}"
+        printf "%s\n" "$WASM_SMOKE_OUT"
+        FAIL=$((FAIL + 1))
+    fi
+fi
+
 # ── Teardown ─────────────────────────────────────────────────
 
 start_spinner "Tearing down"
-rm -rf "$SCRATCH" 2>/dev/null || true
+rm -rf "$SCRATCH" "$WASM_SCRATCH" 2>/dev/null || true
 stop_spinner
 
 SUMMARY="${GREEN}$PASS passed${RESET}, ${RED}$FAIL failed${RESET}"

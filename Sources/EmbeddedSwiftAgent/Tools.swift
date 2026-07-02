@@ -2,6 +2,19 @@ import Cstdio
 
 // MARK: - Tool Registry
 
+// The shell-backed tools (sh, glob, grep) need processes, which don't exist
+// on WASI — the browser build ships the file/HTTP/subagent tools only.
+#if os(WASI)
+let allTools: [Tool] = [
+    subagentTool,
+    readFileTool,
+    writeFileTool,
+    strReplaceTool,
+    webSearchTool,
+    webFetchTool,
+    mcpTool,
+]
+#else
 let allTools: [Tool] = [
     shellTool,
     subagentTool,
@@ -14,6 +27,7 @@ let allTools: [Tool] = [
     webFetchTool,
     mcpTool,
 ]
+#endif
 
 // MARK: - Tool Dispatch
 
@@ -62,6 +76,7 @@ extension AgentLoop {
 
 // MARK: - Shell
 
+#if !os(WASI)
 let shellTool = Tool(
     definition: ToolDefinition(
         name: "sh",
@@ -93,6 +108,7 @@ let shellTool = Tool(
         return (content, result.exitCode != 0)
     }
 )
+#endif
 
 // MARK: - Subagent
 
@@ -293,9 +309,8 @@ let writeFileTool = Tool(
             return "."
         }()
         if !utf8Equal(dir, ".") {
-            let mkdirResult = runShell("mkdir -p \(shellEscape(dir))")
-            if mkdirResult.exitCode != 0 {
-                return ("write_file error: mkdir -p failed: \(mkdirResult.output)", true)
+            if let mkdirError = mkdirRecursive(dir) {
+                return ("write_file error: \(mkdirError)", true)
             }
         }
 
@@ -422,6 +437,7 @@ let strReplaceTool = Tool(
 
 // MARK: - Glob
 
+#if !os(WASI)
 let globTool = Tool(
     definition: ToolDefinition(
         name: "glob",
@@ -503,6 +519,7 @@ let grepTool = Tool(
         return (content, false)
     }
 )
+#endif
 
 // MARK: - Web Search
 

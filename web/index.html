@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EmbeddedSwiftAgent — a coding agent in your browser</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@6.0.0/css/xterm.min.css">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --window-bg: #1c2128;
+      --titlebar: #2d333b;
+      --field-bg: #0d1117;
+      --border: #30363d;
+      --text: #e6edf3;
+      --dim: #8b949e;
+      --label: #adbac7;
+      --accent: #58a6ff;
+      --red: #f85149;
+      --green: #238636;
+      --green-hover: #2ea043;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(1200px 700px at 50% -5%, #171d26, #0b0e13 65%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    }
+    body { display: flex; align-items: center; justify-content: center; }
+
+    /* The floating mac window — hosts the setup form first, then the running
+       agent. Fixed size; resizing it is just ceremony. */
+    #window {
+      display: flex;
+      flex-direction: column;
+      width: min(760px, 94vw);
+      height: min(600px, 86vh);
+      background: var(--window-bg);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.7);
+      overflow: hidden;
+    }
+
+    .titlebar {
+      position: relative;
+      flex: 0 0 40px;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      background: var(--titlebar);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .lights { display: flex; gap: 8px; }
+    .light { width: 12px; height: 12px; border-radius: 50%; }
+    .light.red { background: #ff5f57; }
+    .light.yellow { background: #febc2e; }
+    .light.green { background: #28c840; }
+    .title {
+      position: absolute;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--dim);
+      pointer-events: none;
+    }
+
+    /* The body always holds the terminal (kept at a definite size so xterm
+       fits); the setup panel sits on top of it until you hit Start. */
+    .window-body { position: relative; flex: 1; min-height: 0; }
+
+    #terminal-wrap { position: absolute; inset: 0; padding: 10px; background: var(--bg); }
+    #terminal { width: 100%; height: 100%; }
+
+    #setup {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      background: var(--window-bg);
+      transition: opacity 0.25s ease;
+    }
+    #setup.hidden { opacity: 0; pointer-events: none; }
+
+    .fields {
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      max-width: 460px;
+      margin: 0 auto;
+      padding: 24px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      justify-content: center;
+      overflow: auto;
+    }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .label-row { display: flex; align-items: center; font-size: 12px; color: var(--label); }
+    .req-star { color: var(--red); margin-left: 5px; font-weight: 700; }
+
+    .fields input, .fields select {
+      width: 100%;
+      padding: 9px 10px;
+      font: inherit;
+      font-size: 13px;
+      color: var(--text);
+      background: var(--field-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    #openrouter-key, #model, #exa-key {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .fields input:focus, .fields select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+    }
+
+    #jspi-note {
+      font-size: 12px;
+      line-height: 1.4;
+      color: #ff7b72;
+      background: rgba(248, 81, 73, 0.1);
+      border: 1px solid rgba(248, 81, 73, 0.3);
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+
+    .setup-footer {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .setup-footer .note { font-size: 11px; color: var(--dim); }
+
+    #start {
+      background: var(--green);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 18px;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    #start:hover:not(:disabled) { background: var(--green-hover); }
+    #start:disabled { background: #21262d; color: #6e7681; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <div id="window">
+    <div class="titlebar">
+      <div class="lights">
+        <span class="light red"></span>
+        <span class="light yellow"></span>
+        <span class="light green"></span>
+      </div>
+      <div class="title">EmbeddedSwiftAgent</div>
+    </div>
+
+    <div class="window-body">
+      <div id="terminal-wrap"><div id="terminal"></div></div>
+
+      <form id="setup" autocomplete="off">
+        <div class="fields">
+          <label class="field">
+            <span class="label-row">OpenRouter API key <span class="req-star">*</span></span>
+            <input id="openrouter-key" type="password" placeholder="sk-or-..." autocomplete="off" autofocus>
+          </label>
+
+          <label class="field">
+            <span class="label-row">Model <span class="req-star">*</span></span>
+            <input id="model" type="text" value="anthropic/claude-haiku-4.5" autocomplete="off">
+          </label>
+
+          <label class="field">
+            <span class="label-row">Reasoning effort</span>
+            <select id="effort">
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high" selected>high</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span class="label-row">Exa API key</span>
+            <input id="exa-key" type="password" placeholder="for web search &amp; fetch" autocomplete="off">
+          </label>
+
+          <div id="jspi-note" hidden></div>
+        </div>
+
+        <div class="setup-footer">
+          <span class="note">Keys stay in this browser.</span>
+          <button id="start" type="submit" disabled>Start</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@6.0.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.11.0/lib/addon-fit.min.js"></script>
+  <script type="module">
+    import { bootAgent, jspiSupported } from "./agent.js";
+
+    const term = new Terminal({
+      convertEol: true,
+      cursorBlink: true,
+      fontSize: 13,
+      scrollback: 5000,
+      theme: {
+        background: "#0d1117",
+        foreground: "#e6edf3",
+        cursor: "#58a6ff",
+      },
+    });
+    const fit = new FitAddon.FitAddon();
+    term.loadAddon(fit);
+    term.open(document.getElementById("terminal"));
+    fit.fit();
+    addEventListener("resize", () => fit.fit());
+
+    const $ = (id) => document.getElementById(id);
+    const setup = $("setup");
+    const startBtn = $("start");
+
+    // Persist each field to localStorage and restore it on load.
+    const fields = {
+      "openrouter-key": "esa_openrouter_key",
+      "model": "esa_model",
+      "effort": "esa_effort",
+      "exa-key": "esa_exa_key",
+    };
+    for (const [id, key] of Object.entries(fields)) {
+      const el = $(id);
+      const saved = localStorage.getItem(key);
+      if (saved) el.value = saved;
+      const save = () => {
+        localStorage.setItem(key, el.value);
+        validate();
+      };
+      el.addEventListener("input", save);
+      el.addEventListener("change", save);
+    }
+
+    // JSPI is required for the synchronous Swift loop to "block" on fetch.
+    const jspiOK = jspiSupported();
+    if (!jspiOK) {
+      const note = $("jspi-note");
+      note.hidden = false;
+      note.textContent =
+        "This demo needs WebAssembly JSPI — open it in Chrome or Edge 137+ " +
+        "(Firefox: enable javascript.options.wasm_js_promise_integration; " +
+        "Safari: Technology Preview).";
+    }
+
+    // Start is clickable only when the required (*) fields are filled.
+    function validate() {
+      startBtn.disabled = !(
+        jspiOK &&
+        $("openrouter-key").value.trim() &&
+        $("model").value.trim()
+      );
+    }
+    validate();
+    $("openrouter-key").focus();
+
+    async function start() {
+      if (startBtn.disabled) return;
+      // Fade the setup form away; the agent runs in the same window's terminal.
+      setup.classList.add("hidden");
+      setTimeout(() => { setup.style.display = "none"; }, 250);
+      fit.fit();
+      term.focus();
+
+      try {
+        await bootAgent({
+          term,
+          wasmUrl: "EmbeddedSwiftAgent.wasm",
+          env: {
+            OPENROUTER_API_KEY: $("openrouter-key").value.trim(),
+            EXA_API_KEY: $("exa-key").value.trim(),
+            MODEL: $("model").value.trim(),
+            REASONING_EFFORT: $("effort").value,
+          },
+        });
+      } catch (e) {
+        term.write(`\r\n\x1b[31m[boot failed: ${e}]\x1b[0m\r\n`);
+        console.error(e);
+      }
+    }
+
+    // Hitting Enter in any field submits the form and starts the agent.
+    $("setup").addEventListener("submit", (e) => {
+      e.preventDefault();
+      start();
+    });
+  </script>
+</body>
+</html>

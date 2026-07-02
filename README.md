@@ -86,31 +86,50 @@ make size    # print stripped binary size
 make clean   # remove build artifacts
 ```
 
+## Browser (WebAssembly)
+
+The agent also compiles to a `wasm32-unknown-wasip1` module and runs entirely in the browser: xterm.js front end, in-memory filesystem, bring-your-own OpenRouter key. The synchronous agent loop is kept as-is; the JS host suspends the wasm stack with JSPI (`WebAssembly.Suspending`) while awaiting `fetch` and keystrokes, so it needs a JSPI-capable browser (Chrome/Edge 137+; Firefox behind a flag; Safari Technology Preview). The `sh`, `glob`, and `grep` tools are compiled out (no processes on WASI); everything else works, including subagents and streaming. See `plans/wasm-port.md` for the design.
+
+Build it:
+
+```bash
+# one-time: install the wasm Swift SDK matching the +main-snapshot toolchain
+swift sdk install <swift-DEVELOPMENT-SNAPSHOT-...-a_wasm.artifactbundle.tar.gz URL or local file>
+
+make wasm    # compiles and copies the module into web/
+```
+
+Then serve the `web/` directory from any static host (no special headers needed — the build is single-threaded, so no SharedArrayBuffer/COOP/COEP). Locally: `make web` serves `web/` and opens the demo (or run `python3 -m http.server 8765` from `web/` yourself). To ship it on a site, copy `web/index.html`, `web/agent.js`, and `web/EmbeddedSwiftAgent.wasm`.
+
 ## Test
 
 ```bash
 make test
 ```
 
-Runs three phases:
+Runs four phases:
 
-1. **Build** — compiles release binaries for macOS and Linux (via Docker) in parallel, reports stripped binary sizes
+1. **Build** — compiles release binaries for macOS, Linux (via Docker), and WebAssembly in parallel, reports binary sizes
 2. **Agent tests** — sends real prompts through the built binary to verify:
   - Plain response (agent replies and returns to prompt)
   - Tool call success (agent runs `uuidgen` and returns a UUID)
   - Tool call failure (agent survives a bad command without crashing)
   - Subagent (spawns two subagents, each runs a command, main agent combines output)
-3. **Teardown** — cleans up build artifacts
+3. **Wasm smoke tests** — runs the real `.wasm` module through the real `web/agent.js` glue headlessly in Node (which ships JSPI), with canned SSE responses instead of the network: streaming/prompt cycle, SSE parsing across chunk boundaries, and a tool-call round trip against the in-memory WASI filesystem (`web/test/wasm-smoke.mjs`)
+4. **Teardown** — cleans up build artifacts
 
-Agent tests require `OPENROUTER_API_KEY`. Set `MODEL` to override the default model. Linux build requires Docker (skipped if unavailable).
+Agent tests require `OPENROUTER_API_KEY`. Set `MODEL` to override the default model. Linux build requires Docker (skipped if unavailable). Wasm build requires the wasm Swift SDK (skipped if not installed); the wasm smoke tests additionally need a recent `node` (for JSPI) and don't use an API key. `node` is optional: without it the wasm smoke tests are skipped, so it's never required to run the suite.
 
 ## Performance
 
 
-| Target        | Stripped Size           |
+| Target        | Size                    |
 | ------------- | ----------------------- |
-| macOS arm64   | 201.8 KB (206736 bytes) |
-| Linux aarch64 | 195.0 KB (199688 bytes) |
+| macOS arm64   | 200.7 KB (205560 bytes) |
+| Linux aarch64 | 195.0 KB (199704 bytes) |
+| wasm32-wasip1 | 206.1 KB (211093 bytes) |
+
+_macOS and Linux are stripped release binaries; wasm is the shipped `.wasm` module._
 
 
 Startup time to interactive prompt: **~120ms** (mean of 30 runs, σ=1.9ms, 95% CI ±0.7ms). Measured on Apple Silicon (M4 Pro) by piping empty input and timing process lifetime.

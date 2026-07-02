@@ -1,16 +1,6 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-#if os(macOS)
-let platformLinkerFlags: [LinkerSetting] = [
-    .unsafeFlags(["-use-ld=/usr/bin/ld"]),
-]
-#else
-let platformLinkerFlags: [LinkerSetting] = [
-    .linkedLibrary("bsd"),
-]
-#endif
-
 let package = Package(
     name: "EmbeddedSwiftAgent",
     platforms: [.macOS(.v14)],
@@ -36,15 +26,26 @@ let package = Package(
         ),
         .executableTarget(
             name: "EmbeddedSwiftAgent",
-            dependencies: ["Ccurl", "CcJSON", "Cstdio"],
+            dependencies: [
+                // curl only backs the native HTTP implementation; the wasm build
+                // talks to the browser's fetch through JS imports instead (see
+                // HTTPWasm.swift and web/agent.js).
+                .target(name: "Ccurl", condition: .when(platforms: [.macOS, .linux])),
+                "CcJSON",
+                "Cstdio",
+            ],
             path: "Sources/EmbeddedSwiftAgent",
             swiftSettings: [
                 .enableExperimentalFeature("Embedded"),
                 .unsafeFlags(["-whole-module-optimization"]),
             ],
             linkerSettings: [
-                .linkedLibrary("curl"),
-            ] + platformLinkerFlags
+                .linkedLibrary("curl", .when(platforms: [.macOS, .linux])),
+                .linkedLibrary("bsd", .when(platforms: [.linux])),
+                .unsafeFlags(["-use-ld=/usr/bin/ld"], .when(platforms: [.macOS])),
+                // DWARF + name sections are ~70% of the wasm binary otherwise.
+                .unsafeFlags(["-Xlinker", "--strip-all"], .when(platforms: [.wasi])),
+            ]
         )
     ]
 )

@@ -88,6 +88,31 @@ func shellEscape(_ s: String) -> String {
     return out.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
 }
 
+/// Creates `dir` and any missing parent directories (a native `mkdir -p`).
+/// Returns nil on success, or an error description on failure.
+/// Works on every platform including WASI — no shell involved.
+func mkdirRecursive(_ dir: String) -> String? {
+    let bytes = Array(dir.utf8)
+    guard !bytes.isEmpty else { return nil }
+    var i = 0
+    while i <= bytes.count {
+        // At each '/' (and at the end of the path), create the prefix so far.
+        if i == bytes.count || bytes[i] == 0x2F {
+            if i > 0 {
+                var prefix = Array(bytes[0..<i])
+                prefix.append(0)
+                let partial = prefix.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+                let rc = partial.withCString { sc_mkdir($0) }
+                if rc != 0 {
+                    return "cannot create directory '\(partial)'"
+                }
+            }
+        }
+        i += 1
+    }
+    return nil
+}
+
 /// Trims leading and trailing ASCII whitespace (space, tab, CR, LF)
 func trimWhitespace(_ s: String) -> String {
     var bytes = Array(s.utf8)

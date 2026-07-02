@@ -1,11 +1,16 @@
 #include "include/Cstdio.h"
 #include <errno.h>
 #include <time.h>
+
+#ifndef __wasi__
 #include <termios.h>
+#endif
 
 #ifdef __APPLE__
 #include <crt_externs.h>
 #endif
+
+// MARK: - Common (all platforms)
 
 void flush_stdout(void) {
     fflush(stdout);
@@ -37,6 +42,170 @@ char *read_line_stdin(void) {
     }
     return line;
 }
+
+int sc_mkdir(const char *path) {
+    if (mkdir(path, 0755) == 0 || errno == EEXIST) {
+        return 0;
+    }
+    return -1;
+}
+
+int sc_read_byte_stdin(void) {
+    unsigned char c;
+    ssize_t n = read(STDIN_FILENO, &c, 1);
+    if (n <= 0) return -1;
+    return (int)c;
+}
+
+// MARK: - Atomic flag (all platforms)
+//
+// sig_atomic_t so it's safe to set from a SIGINT handler on native. WASI has
+// no signals (and no signal.h without emulation shims), so a plain int —
+// the module is single-threaded there anyway.
+
+#ifdef __wasi__
+typedef volatile int sc_flag_t;
+#else
+typedef volatile sig_atomic_t sc_flag_t;
+#endif
+
+void *sc_atomic_flag_create(void) {
+    sc_flag_t *flag = (sc_flag_t *)malloc(sizeof(sc_flag_t));
+    if (flag == NULL) {
+        return NULL;
+    }
+    *flag = 0;
+    return (void *)flag;
+}
+
+void sc_atomic_flag_set(void *flag_handle) {
+    if (flag_handle == NULL) {
+        return;
+    }
+    sc_flag_t *flag = (sc_flag_t *)flag_handle;
+    *flag = 1;
+}
+
+int sc_atomic_flag_read(void *flag_handle) {
+    if (flag_handle == NULL) {
+        return 0;
+    }
+    sc_flag_t *flag = (sc_flag_t *)flag_handle;
+    return *flag;
+}
+
+void sc_atomic_flag_reset(void *flag_handle) {
+    if (flag_handle == NULL) {
+        return;
+    }
+    sc_flag_t *flag = (sc_flag_t *)flag_handle;
+    *flag = 0;
+}
+
+void sc_atomic_flag_destroy(void *flag_handle) {
+    if (flag_handle == NULL) {
+        return;
+    }
+    free(flag_handle);
+}
+
+#ifdef __wasi__
+
+// MARK: - WASI stubs
+//
+// The wasm module is single-threaded: sc_thread_create reports failure, which
+// makes callers (parallel tools, input reader) fall back to inline execution
+// with zero Swift changes. Mutex/cond handles become inert allocations so the
+// shared Swift code runs unchanged.
+
+void *sc_thread_create(sc_thread_callback_t callback, void *context) {
+    (void)callback;
+    (void)context;
+    return NULL;
+}
+
+void sc_thread_join(void *thread_handle) {
+    (void)thread_handle;
+}
+
+void *sc_mutex_create(void) {
+    return malloc(1);
+}
+
+void sc_mutex_lock(void *mutex_handle) {
+    (void)mutex_handle;
+}
+
+void sc_mutex_unlock(void *mutex_handle) {
+    (void)mutex_handle;
+}
+
+void sc_mutex_destroy(void *mutex_handle) {
+    free(mutex_handle);
+}
+
+void *sc_cond_create(void) {
+    return malloc(1);
+}
+
+void sc_cond_signal(void *cond_handle) {
+    (void)cond_handle;
+}
+
+void sc_cond_timedwait(void *cond_handle, void *mutex_handle, int timeout_ms) {
+    (void)cond_handle;
+    (void)mutex_handle;
+    (void)timeout_ms;
+}
+
+void sc_cond_destroy(void *cond_handle) {
+    free(cond_handle);
+}
+
+// No signals on WASI — abort arrives through the agent_abort export instead.
+void sc_install_sigint_handler(void *flag_handle) {
+    (void)flag_handle;
+}
+
+// No argv in the browser — configuration comes in as WASI env vars.
+int sc_get_argc(void) {
+    return 0;
+}
+
+const char *sc_get_argv(int index) {
+    (void)index;
+    return NULL;
+}
+
+// No termios on WASI; xterm.js handles all key input on the JS side.
+void sc_enable_raw_mode(void) {}
+void sc_disable_raw_mode(void) {}
+
+// MARK: - Browser abort bridge
+//
+// The JS host calls the agent_abort export when the user hits Ctrl+C while
+// the agent is running. It only writes a C global (no allocator, no Swift
+// runtime), so it's safe to call while the main wasm stack is suspended via
+// JSPI. The Swift HTTP layer polls it at chunk boundaries.
+
+static volatile int g_wasm_abort = 0;
+
+__attribute__((export_name("agent_abort")))
+void agent_abort(void) {
+    g_wasm_abort = 1;
+}
+
+int sc_wasm_abort_pending(void) {
+    return g_wasm_abort;
+}
+
+void sc_wasm_abort_clear(void) {
+    g_wasm_abort = 0;
+}
+
+#else // !__wasi__
+
+// MARK: - Native threads (pthreads)
 
 void *sc_thread_create(sc_thread_callback_t callback, void *context) {
     if (callback == NULL) {
@@ -155,47 +324,9 @@ void sc_cond_destroy(void *cond_handle) {
     free(cond);
 }
 
-void *sc_atomic_flag_create(void) {
-    volatile sig_atomic_t *flag = (volatile sig_atomic_t *)malloc(sizeof(sig_atomic_t));
-    if (flag == NULL) {
-        return NULL;
-    }
-    *flag = 0;
-    return (void *)flag;
-}
+// MARK: - SIGINT handler
 
-void sc_atomic_flag_set(void *flag_handle) {
-    if (flag_handle == NULL) {
-        return;
-    }
-    volatile sig_atomic_t *flag = (volatile sig_atomic_t *)flag_handle;
-    *flag = 1;
-}
-
-int sc_atomic_flag_read(void *flag_handle) {
-    if (flag_handle == NULL) {
-        return 0;
-    }
-    volatile sig_atomic_t *flag = (volatile sig_atomic_t *)flag_handle;
-    return *flag;
-}
-
-void sc_atomic_flag_reset(void *flag_handle) {
-    if (flag_handle == NULL) {
-        return;
-    }
-    volatile sig_atomic_t *flag = (volatile sig_atomic_t *)flag_handle;
-    *flag = 0;
-}
-
-void sc_atomic_flag_destroy(void *flag_handle) {
-    if (flag_handle == NULL) {
-        return;
-    }
-    free(flag_handle);
-}
-
-static volatile sig_atomic_t *g_sc_sigint_flag = NULL;
+static sc_flag_t *g_sc_sigint_flag = NULL;
 
 static void sc_sigint_handler(int signo) {
     (void)signo;
@@ -205,7 +336,7 @@ static void sc_sigint_handler(int signo) {
 }
 
 void sc_install_sigint_handler(void *flag_handle) {
-    g_sc_sigint_flag = (volatile sig_atomic_t *)flag_handle;
+    g_sc_sigint_flag = (sc_flag_t *)flag_handle;
     signal(SIGINT, sc_sigint_handler);
 }
 
@@ -234,12 +365,7 @@ void sc_disable_raw_mode(void) {
     g_raw_mode_enabled = 0;
 }
 
-int sc_read_byte_stdin(void) {
-    unsigned char c;
-    ssize_t n = read(STDIN_FILENO, &c, 1);
-    if (n <= 0) return -1;
-    return (int)c;
-}
+// MARK: - argv capture
 
 #ifdef __APPLE__
 
@@ -273,3 +399,5 @@ const char *sc_get_argv(int index) {
 }
 
 #endif
+
+#endif // !__wasi__
